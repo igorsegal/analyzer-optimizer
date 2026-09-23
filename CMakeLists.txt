@@ -53,7 +53,7 @@ target_include_directories(graal_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_executable(test_04_1 ${TEST_SOURCES})
 
 # Связываем с библиотекой
-target_link_libraries(test_041 PRIVATE graal_core)
+target_link_libraries(test_04_1 PRIVATE graal_core)
 
 # Пули для тестов
 target_include_directories(test_04_1 PRIVATE ${CMAKE_SOURCE_DIR}/src)

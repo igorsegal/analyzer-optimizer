@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "status": "DRAFT_DO_NOT_OPEN_OOS",
+  "data": {
+    "raw_root": "D:\\AHexaTrader\\DataFiles\\raw",
+    "canonical_file_pattern": "*_M5.bin",
+    "canonical_period_seconds": 300,
+    "timezone": "UTC",
+    "resample_from_m5": true,
+    "daily_boundary_offset_seconds": 0,
+    "specs_csv": "docs/symbol_specs_normalized.csv"
+  },
+  "strategy": {
+    "name": "spartak_price_baseline_v0_1",
+    "source_status": "machine_hypothesis",
+    "entry_branch": "market_next_open_after_confirm",
+    "base_timeframe": "H1",
+    "signal_timeframe": "M5",
+    "require_daily_alignment": false,
+    "partial_exit_branch": "t1_50_t2_50_remainder_exit_rule_pending"
+  },
+  "grid": {
+    "accumulation_bars": [3, 5, 8],
+    "accumulation_max_range_atr": [1.0, 1.5, 2.0],
+    "breakout_min_atr": [0.25, 0.5],
+    "retest_max_bars": [3, 6, 12],
+    "retest_tolerance_atr": [0.1, 0.25],
+    "stop_buffer_atr": [0.0, 0.1],
+    "target_r": [1.5, 2.0, 3.0]
+  },
+  "split": {
+    "in_sample_fraction": 0.6,
+    "validation_fraction": 0.2,
+    "blind_oos_fraction": 0.2,
+    "embargo_m5_bars": 288,
+    "minimum_bars_per_partition": 1000
+  },
+  "selection": {
+    "top_k": 50,
+    "minimum_is_trades": 30,
+    "minimum_validation_trades": 15,
+    "objective": "TO_BE_LOCKED_BEFORE_RUN",
+    "preserve_validation_rank_in_oos": true
+  },
+  "risk": {
+    "initial_equity": 100000.0,
+    "risk_fraction_per_trade": 0.0025,
+    "maximum_total_open_risk": 0.01,
+    "maximum_gross_leverage": 3.0
+  },
+  "costs": {
+    "bar_spread_from_bin": true,
+    "commission_per_lot_per_side": null,
+    "slippage_points": null,
+    "fx_metal_swap": null,
+    "crypto_funding": null,
+    "missing_cost_policy": "FAIL_CLOSED"
+  },
+  "blind_oos": {
+    "allow_audit": false,
+    "required_leaderboard_lock_id": null,
+    "never_resort_on_oos": true
+  }
+}

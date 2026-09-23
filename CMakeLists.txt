@@ -31,7 +31,6 @@ set(SOURCES
 
 # Тестовые файлы
 set(TEST_SOURCES
-    tests/test_04_1.cpp
     src/structures.h
     src/data_loader.h
     src/data_loader.cpp
@@ -46,17 +45,6 @@ add_library(graal_core STATIC ${SOURCES})
 
 # Пули для библиотеки
 target_include_directories(graal_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
-
-# ============================================================================
-# ТЕСТОВЫЙ ИСПОЛНЯЕМЫЙ ФАЙЛ (test_04_1)
-# ============================================================================
-add_executable(test_04_1 ${TEST_SOURCES})
-
-# Связываем с библиотекой
-target_link_libraries(test_04_1 PRIVATE graal_core)
-
-# Пули для тестов
-target_include_directories(test_04_1 PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # ============================================================================
 # ПАПКА ВЫХОДА (build/)

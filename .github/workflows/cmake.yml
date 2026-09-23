@@ -6,6 +6,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Configure CMake
-      run: cmake -B build
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
     - name: Build Project
-      run: cmake --build build --config Release
+      run: cmake --build build --config Release --clean-first

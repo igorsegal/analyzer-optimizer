@@ -145,7 +145,7 @@ const std::string OUTPUT_CSV = "top50_pairs.csv";
 const int RECORD_SIZE = 60;
 
 // Магическое число заголовка
-const char MAGIC[8] = "XFBAR001";
+const char MAGIC[9] = "XFBAR001";
 
 } // namespace AHexa
 

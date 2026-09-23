@@ -1,0 +1,11 @@
+﻿name: C++ CMake CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Configure CMake
+      run: cmake -B build
+    - name: Build Project
+      run: cmake --build build --config Release

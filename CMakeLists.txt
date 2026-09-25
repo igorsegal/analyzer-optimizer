@@ -44,6 +44,7 @@ add_library(spartak_core STATIC
     src/position/VolumeSplitter50.cpp
     src/position/BreakEvenTransfer.cpp
     src/position/SwapAccrualTracker.cpp
+    src/position/CloseCommissionCalculator.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -79,6 +80,7 @@ add_executable(smoke_trigger      smoke_trigger.cpp)
 add_executable(smoke_splitter     smoke_splitter.cpp)
 add_executable(smoke_breakeven    smoke_breakeven.cpp)
 add_executable(smoke_swap         smoke_swap.cpp)
+add_executable(smoke_commission   smoke_commission.cpp)
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -110,4 +112,5 @@ target_link_libraries(smoke_trigger      PRIVATE spartak_core)
 target_link_libraries(smoke_splitter     PRIVATE spartak_core)
 target_link_libraries(smoke_breakeven    PRIVATE spartak_core)
 target_link_libraries(smoke_swap         PRIVATE spartak_core)
+target_link_libraries(smoke_commission   PRIVATE spartak_core)
 enable_testing()

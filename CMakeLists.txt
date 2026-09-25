@@ -36,6 +36,7 @@ add_library(spartak_core STATIC
     src/patterns/ATRImpulseBreakoutDetector.cpp
     src/patterns/PatternAggregator.cpp
     src/validation/SpreadFilter.cpp
+    src/validation/CounterTrendPUChecker.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -66,6 +67,7 @@ add_executable(smoke_engulfing    smoke_engulfing.cpp)
 add_executable(smoke_impulse      smoke_impulse.cpp)
 add_executable(smoke_pattern      smoke_pattern.cpp)
 add_executable(smoke_spread       smoke_spread.cpp)
+add_executable(smoke_counter      smoke_counter.cpp)
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -86,6 +88,7 @@ target_link_libraries(smoke_engulfing    PRIVATE spartak_core)
 target_link_libraries(smoke_impulse      PRIVATE spartak_core)
 target_link_libraries(smoke_pattern      PRIVATE spartak_core)
 target_link_libraries(smoke_spread       PRIVATE spartak_core)
+target_link_libraries(smoke_counter      PRIVATE spartak_core)
 # -----------------------------------------------------------------------------
 #  Tests
 # -----------------------------------------------------------------------------

@@ -18,7 +18,8 @@ PUZoneCalculator::PUZoneCalculator(double point, int offset_points)
 core::PriceZone PUZoneCalculator::buildOne(const Extremum& ex) const {
     const double delta = static_cast<double>(offset_points_) * point_;
     core::PriceZone z;
-    z.type         = core::LevelType::IntermediateLevel;
+    z.type           = core::LevelType::IntermediateLevel;
+    z.formation_time = ex.timestamp;
     z.price_level  = ex.price;
     z.zone_top     = ex.price + delta;
     z.zone_bottom  = ex.price - delta;

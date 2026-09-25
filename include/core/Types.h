@@ -52,7 +52,8 @@ enum class LevelType {
 };
 
 struct PriceZone {
-    LevelType type        = LevelType::LocalLevel;
+    LevelType type           = LevelType::LocalLevel;
+    int64_t   formation_time = 0;
     double    price_level = 0.0;
     double    zone_top    = 0.0;
     double    zone_bottom = 0.0;

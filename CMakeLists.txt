@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 if (MSVC)
-    add_compile_options(/W4 /permissive- /utf-8)
+    add_compile_options(/W4 /permissive- /utf-8 /wd4996 /wd4834)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -O2)
 endif()
@@ -34,6 +34,8 @@ add_library(spartak_core STATIC
     src/patterns/InsideBarDetector.cpp
     src/patterns/EngulfingDetector.cpp
     src/patterns/ATRImpulseBreakoutDetector.cpp
+    src/patterns/PatternAggregator.cpp
+    src/validation/SpreadFilter.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -62,6 +64,8 @@ add_executable(smoke_pinbar       smoke_pinbar.cpp)
 add_executable(smoke_inside       smoke_inside.cpp)
 add_executable(smoke_engulfing    smoke_engulfing.cpp)
 add_executable(smoke_impulse      smoke_impulse.cpp)
+add_executable(smoke_pattern      smoke_pattern.cpp)
+add_executable(smoke_spread       smoke_spread.cpp)
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -80,11 +84,8 @@ target_link_libraries(smoke_pinbar       PRIVATE spartak_core)
 target_link_libraries(smoke_inside       PRIVATE spartak_core)
 target_link_libraries(smoke_engulfing    PRIVATE spartak_core)
 target_link_libraries(smoke_impulse      PRIVATE spartak_core)
-# -----------------------------------------------------------------------------
-#  Main executable (активируется на этапе engine/)
-# -----------------------------------------------------------------------------
-# add_executable(spartak main.cpp)
-# target_link_libraries(spartak PRIVATE spartak_core)
+target_link_libraries(smoke_pattern      PRIVATE spartak_core)
+target_link_libraries(smoke_spread       PRIVATE spartak_core)
 # -----------------------------------------------------------------------------
 #  Tests
 # -----------------------------------------------------------------------------

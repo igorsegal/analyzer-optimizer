@@ -26,6 +26,7 @@ add_library(spartak_core STATIC
     src/context/OldLevelCleaner.cpp
     src/context/TrendBiasEvaluator.cpp
     src/context/ContextAggregator.cpp
+    src/patterns/CandleGeometryCalculator.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -47,6 +48,7 @@ add_executable(smoke_zones      smoke_zones.cpp)
 add_executable(smoke_cleaner    smoke_cleaner.cpp)
 add_executable(smoke_bias       smoke_bias.cpp)
 add_executable(smoke_context    smoke_context.cpp)
+add_executable(smoke_candle     smoke_candle.cpp)
 target_link_libraries(smoke_data       PRIVATE spartak_core)
 target_link_libraries(smoke_file       PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize   PRIVATE spartak_core)
@@ -58,6 +60,7 @@ target_link_libraries(smoke_zones      PRIVATE spartak_core)
 target_link_libraries(smoke_cleaner    PRIVATE spartak_core)
 target_link_libraries(smoke_bias       PRIVATE spartak_core)
 target_link_libraries(smoke_context    PRIVATE spartak_core)
+target_link_libraries(smoke_candle     PRIVATE spartak_core)
 # -----------------------------------------------------------------------------
 #  Main executable (активируется на этапе engine/)
 # -----------------------------------------------------------------------------

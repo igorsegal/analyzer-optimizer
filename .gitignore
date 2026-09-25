@@ -1,4 +1,57 @@
-﻿build/
-*.exe
+# Build
+build/
+out/
+bin/
+obj/
+*.dir/
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+Makefile
+build.ninja
+.ninja_deps
+.ninja_log
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.vcxproj
+*.vcxproj.filters
+*.sln
+*.slnx
+x64/
+Release/
+Debug/
+RelWithDebInfo/
+MinSizeRel/
+ipch/
+# MSVC intermediate
 *.obj
+*.iobj
+*.pdb
+*.ipdb
+*.ilk
+*.exp
+*.lib
+*.tlog
 *.log
+*.idb
+*.pch
+*.res
+*.recipe
+# Executables
+*.exe
+# Office artefacts (никогда не коммитим)
+*.docx
+*.xlsx
+*.pptx
+~$*
+# System
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -8,9 +8,6 @@ if (MSVC)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -O2)
 endif()
-# -----------------------------------------------------------------------------
-#  Core library
-# -----------------------------------------------------------------------------
 add_library(spartak_core STATIC
     src/core/Config.cpp
     src/data/XFBarReader.cpp
@@ -37,16 +34,11 @@ add_library(spartak_core STATIC
     src/patterns/PatternAggregator.cpp
     src/validation/SpreadFilter.cpp
     src/validation/CounterTrendPUChecker.cpp
+    src/validation/MoneyRiskCalculator.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
-# -----------------------------------------------------------------------------
-#  Tools
-# -----------------------------------------------------------------------------
 add_executable(csv2xfbar tools/csv2xfbar.cpp)
-# -----------------------------------------------------------------------------
-#  Smoke tests (temporary)
-# -----------------------------------------------------------------------------
 add_executable(smoke_data         smoke_data.cpp)
 add_executable(smoke_file         smoke_file.cpp)
 add_executable(smoke_sanitize     smoke_sanitize.cpp)
@@ -68,6 +60,7 @@ add_executable(smoke_impulse      smoke_impulse.cpp)
 add_executable(smoke_pattern      smoke_pattern.cpp)
 add_executable(smoke_spread       smoke_spread.cpp)
 add_executable(smoke_counter      smoke_counter.cpp)
+add_executable(smoke_money        smoke_money.cpp)
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -89,8 +82,5 @@ target_link_libraries(smoke_impulse      PRIVATE spartak_core)
 target_link_libraries(smoke_pattern      PRIVATE spartak_core)
 target_link_libraries(smoke_spread       PRIVATE spartak_core)
 target_link_libraries(smoke_counter      PRIVATE spartak_core)
-# -----------------------------------------------------------------------------
-#  Tests
-# -----------------------------------------------------------------------------
+target_link_libraries(smoke_money        PRIVATE spartak_core)
 enable_testing()
-# add_subdirectory(tests)

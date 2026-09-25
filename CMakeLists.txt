@@ -42,6 +42,7 @@ add_library(spartak_core STATIC
     src/validation/SignalValidator.cpp
     src/position/UO1Trigger.cpp
     src/position/VolumeSplitter50.cpp
+    src/position/BreakEvenTransfer.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -75,6 +76,7 @@ add_executable(smoke_slippage     smoke_slippage.cpp)
 add_executable(smoke_validator    smoke_validator.cpp)
 add_executable(smoke_trigger      smoke_trigger.cpp)
 add_executable(smoke_splitter     smoke_splitter.cpp)
+add_executable(smoke_breakeven    smoke_breakeven.cpp)
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -104,4 +106,5 @@ target_link_libraries(smoke_slippage     PRIVATE spartak_core)
 target_link_libraries(smoke_validator    PRIVATE spartak_core)
 target_link_libraries(smoke_trigger      PRIVATE spartak_core)
 target_link_libraries(smoke_splitter     PRIVATE spartak_core)
+target_link_libraries(smoke_breakeven    PRIVATE spartak_core)
 enable_testing()

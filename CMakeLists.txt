@@ -33,6 +33,7 @@ add_library(spartak_core STATIC
     src/patterns/PinbarSellDetector.cpp
     src/patterns/InsideBarDetector.cpp
     src/patterns/EngulfingDetector.cpp
+    src/patterns/ATRImpulseBreakoutDetector.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -60,6 +61,7 @@ add_executable(smoke_confirmation smoke_confirmation.cpp)
 add_executable(smoke_pinbar       smoke_pinbar.cpp)
 add_executable(smoke_inside       smoke_inside.cpp)
 add_executable(smoke_engulfing    smoke_engulfing.cpp)
+add_executable(smoke_impulse      smoke_impulse.cpp)
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -77,6 +79,7 @@ target_link_libraries(smoke_confirmation PRIVATE spartak_core)
 target_link_libraries(smoke_pinbar       PRIVATE spartak_core)
 target_link_libraries(smoke_inside       PRIVATE spartak_core)
 target_link_libraries(smoke_engulfing    PRIVATE spartak_core)
+target_link_libraries(smoke_impulse      PRIVATE spartak_core)
 # -----------------------------------------------------------------------------
 #  Main executable (активируется на этапе engine/)
 # -----------------------------------------------------------------------------

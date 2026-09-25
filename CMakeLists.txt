@@ -20,6 +20,7 @@ add_library(spartak_core STATIC
     src/context/HighExtractor.cpp
     src/context/LowExtractor.cpp
     src/context/StructureValidatorHHHL.cpp
+    src/context/ShadowNoiseFilter.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -36,12 +37,14 @@ add_executable(smoke_sanitize   smoke_sanitize.cpp)
 add_executable(smoke_fractal    smoke_fractal.cpp)
 add_executable(smoke_extractors smoke_extractors.cpp)
 add_executable(smoke_structure  smoke_structure.cpp)
+add_executable(smoke_shadow     smoke_shadow.cpp)
 target_link_libraries(smoke_data       PRIVATE spartak_core)
 target_link_libraries(smoke_file       PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize   PRIVATE spartak_core)
 target_link_libraries(smoke_fractal    PRIVATE spartak_core)
 target_link_libraries(smoke_extractors PRIVATE spartak_core)
 target_link_libraries(smoke_structure  PRIVATE spartak_core)
+target_link_libraries(smoke_shadow     PRIVATE spartak_core)
 # -----------------------------------------------------------------------------
 #  Main executable (активируется на этапе engine/)
 # -----------------------------------------------------------------------------

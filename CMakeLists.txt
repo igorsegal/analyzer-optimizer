@@ -24,6 +24,7 @@ add_library(spartak_core STATIC
     src/context/PUZoneCalculator.cpp
     src/context/LUZoneCalculator.cpp
     src/context/OldLevelCleaner.cpp
+    src/context/TrendBiasEvaluator.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -43,6 +44,7 @@ add_executable(smoke_structure  smoke_structure.cpp)
 add_executable(smoke_shadow     smoke_shadow.cpp)
 add_executable(smoke_zones      smoke_zones.cpp)
 add_executable(smoke_cleaner    smoke_cleaner.cpp)
+add_executable(smoke_bias       smoke_bias.cpp)
 target_link_libraries(smoke_data       PRIVATE spartak_core)
 target_link_libraries(smoke_file       PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize   PRIVATE spartak_core)
@@ -52,6 +54,7 @@ target_link_libraries(smoke_structure  PRIVATE spartak_core)
 target_link_libraries(smoke_shadow     PRIVATE spartak_core)
 target_link_libraries(smoke_zones      PRIVATE spartak_core)
 target_link_libraries(smoke_cleaner    PRIVATE spartak_core)
+target_link_libraries(smoke_bias       PRIVATE spartak_core)
 # -----------------------------------------------------------------------------
 #  Main executable (активируется на этапе engine/)
 # -----------------------------------------------------------------------------

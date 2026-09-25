@@ -48,6 +48,7 @@ add_library(spartak_core STATIC
     src/position/TrailingStopManager.cpp
     src/position/PositionStateSynchronizer.cpp
     src/position/EmergencyCloseHandler.cpp
+    src/position/PositionManager.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -87,6 +88,7 @@ add_executable(smoke_commission   smoke_commission.cpp)
 add_executable(smoke_trailing     smoke_trailing.cpp)
 add_executable(smoke_sync         smoke_sync.cpp)
 add_executable(smoke_emergency    smoke_emergency.cpp)
+add_executable(smoke_manager      smoke_manager.cpp)
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -122,4 +124,5 @@ target_link_libraries(smoke_commission   PRIVATE spartak_core)
 target_link_libraries(smoke_trailing     PRIVATE spartak_core)
 target_link_libraries(smoke_sync         PRIVATE spartak_core)
 target_link_libraries(smoke_emergency    PRIVATE spartak_core)
+target_link_libraries(smoke_manager      PRIVATE spartak_core)
 enable_testing()

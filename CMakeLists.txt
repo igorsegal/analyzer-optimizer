@@ -17,6 +17,8 @@ add_library(spartak_core STATIC
     src/data/BarStream.cpp
     src/data/DataSanitizer.cpp
     src/context/FractalPointDetector.cpp
+    src/context/HighExtractor.cpp
+    src/context/LowExtractor.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -27,14 +29,16 @@ add_executable(csv2xfbar tools/csv2xfbar.cpp)
 # -----------------------------------------------------------------------------
 #  Smoke tests (temporary)
 # -----------------------------------------------------------------------------
-add_executable(smoke_data     smoke_data.cpp)
-add_executable(smoke_file     smoke_file.cpp)
-add_executable(smoke_sanitize smoke_sanitize.cpp)
-add_executable(smoke_fractal  smoke_fractal.cpp)
-target_link_libraries(smoke_data     PRIVATE spartak_core)
-target_link_libraries(smoke_file     PRIVATE spartak_core)
-target_link_libraries(smoke_sanitize PRIVATE spartak_core)
-target_link_libraries(smoke_fractal  PRIVATE spartak_core)
+add_executable(smoke_data       smoke_data.cpp)
+add_executable(smoke_file       smoke_file.cpp)
+add_executable(smoke_sanitize   smoke_sanitize.cpp)
+add_executable(smoke_fractal    smoke_fractal.cpp)
+add_executable(smoke_extractors smoke_extractors.cpp)
+target_link_libraries(smoke_data       PRIVATE spartak_core)
+target_link_libraries(smoke_file       PRIVATE spartak_core)
+target_link_libraries(smoke_sanitize   PRIVATE spartak_core)
+target_link_libraries(smoke_fractal    PRIVATE spartak_core)
+target_link_libraries(smoke_extractors PRIVATE spartak_core)
 # -----------------------------------------------------------------------------
 #  Main executable (активируется на этапе engine/)
 # -----------------------------------------------------------------------------

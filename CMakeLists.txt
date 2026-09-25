@@ -36,6 +36,7 @@ add_library(spartak_core STATIC
     src/validation/CounterTrendPUChecker.cpp
     src/validation/MoneyRiskCalculator.cpp
     src/validation/BrokerLotRounder.cpp
+    src/validation/MarginCallChecker.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -63,6 +64,7 @@ add_executable(smoke_spread       smoke_spread.cpp)
 add_executable(smoke_counter      smoke_counter.cpp)
 add_executable(smoke_money        smoke_money.cpp)
 add_executable(smoke_lot          smoke_lot.cpp)
+add_executable(smoke_margin       smoke_margin.cpp)
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -86,4 +88,5 @@ target_link_libraries(smoke_spread       PRIVATE spartak_core)
 target_link_libraries(smoke_counter      PRIVATE spartak_core)
 target_link_libraries(smoke_money        PRIVATE spartak_core)
 target_link_libraries(smoke_lot          PRIVATE spartak_core)
+target_link_libraries(smoke_margin       PRIVATE spartak_core)
 enable_testing()

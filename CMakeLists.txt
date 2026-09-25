@@ -39,6 +39,7 @@ add_library(spartak_core STATIC
     src/validation/MarginCallChecker.cpp
     src/validation/SessionTimeFilter.cpp
     src/validation/SlippageToleranceChecker.cpp
+    src/validation/SignalValidator.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -69,6 +70,7 @@ add_executable(smoke_lot          smoke_lot.cpp)
 add_executable(smoke_margin       smoke_margin.cpp)
 add_executable(smoke_session      smoke_session.cpp)
 add_executable(smoke_slippage     smoke_slippage.cpp)
+add_executable(smoke_validator    smoke_validator.cpp)
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -95,4 +97,5 @@ target_link_libraries(smoke_lot          PRIVATE spartak_core)
 target_link_libraries(smoke_margin       PRIVATE spartak_core)
 target_link_libraries(smoke_session      PRIVATE spartak_core)
 target_link_libraries(smoke_slippage     PRIVATE spartak_core)
+target_link_libraries(smoke_validator    PRIVATE spartak_core)
 enable_testing()

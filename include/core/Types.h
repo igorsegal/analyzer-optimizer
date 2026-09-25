@@ -67,6 +67,8 @@ struct PriceZone {
 struct MarketContext {
     TrendDirection         daily_trend  = TrendDirection::Undefined;
     TrendDirection         hourly_trend = TrendDirection::Undefined;
+    TrendDirection         dominant_trend  = TrendDirection::Undefined;
+    bool                   trend_conflict       = false;
     std::vector<PriceZone> active_zones;
     bool                   has_hh_hl_structure = false;
 };

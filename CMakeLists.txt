@@ -49,10 +49,22 @@ add_library(spartak_core STATIC
     src/position/PositionStateSynchronizer.cpp
     src/position/EmergencyCloseHandler.cpp
     src/position/PositionManager.cpp
+    src/engine/BacktestPlayer.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
+# -----------------------------------------------------------------------------
+#  Main executable
+# -----------------------------------------------------------------------------
+add_executable(spartak main.cpp)
+target_link_libraries(spartak PRIVATE spartak_core)
+# -----------------------------------------------------------------------------
+#  Tools
+# -----------------------------------------------------------------------------
 add_executable(csv2xfbar tools/csv2xfbar.cpp)
+# -----------------------------------------------------------------------------
+#  Smoke tests (temporary)
+# -----------------------------------------------------------------------------
 add_executable(smoke_data         smoke_data.cpp)
 add_executable(smoke_file         smoke_file.cpp)
 add_executable(smoke_sanitize     smoke_sanitize.cpp)

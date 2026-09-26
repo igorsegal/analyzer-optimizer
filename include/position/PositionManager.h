@@ -71,6 +71,7 @@ struct PositionManagerConfig {
     TrailingConfig            trailing;
     EmergencyConfig           emergency;
     bool    use_trailing        = true;    // включать/выключать трейлинг
+    bool    trail_only_after_tp1 = true;   // трейлить ТОЛЬКО после TP1 (защита прибыли)
     bool    emergency_enabled   = true;    // включать/выключать emergency
 };
 // -----------------------------------------------------------------------------

@@ -239,8 +239,11 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
             }
             continue;
         }
-        // --- 3. Trailing (если разрешён и не BE) ---
-        if (cfg_.use_trailing) {
+        // --- 3. Trailing (только после TP1, если флаг включён) ---
+        const bool trailing_allowed =
+            cfg_.use_trailing
+         && (!cfg_.trail_only_after_tp1 || s.tp1_hit);
+        if (trailing_allowed) {
             auto tr = trailing_.compute(s.side, s.stop_loss,
                                         s.entry_price, bar);
             if (tr.moved) {

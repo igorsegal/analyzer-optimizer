@@ -47,6 +47,9 @@ struct BacktestConfig {
     int64_t max_gap_ms         = 14'400'000LL;   // 4 часа
     // Ограничения
     std::size_t max_bars       = 0;      // 0 = читать все бары
+    std::size_t skip_bars      = 0;      // пропустить первые N агрегированных баров
+    int64_t     from_ms        = 0;      // 0 = без нижней границы
+    int64_t     to_ms          = 0;      // 0 = без верхней границы
     // Вложенные конфиги слоёв
     context::ContextAggregatorConfig   context;
     patterns::PatternAggregatorConfig  pattern;

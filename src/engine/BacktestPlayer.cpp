@@ -123,6 +123,14 @@ BacktestReport BacktestPlayer::run(const std::string& xfbar_path) {
             history.erase(history.begin(),
                           history.begin() + (history.size() - cfg_.rolling_window));
         }
+        // Фильтр по диапазону дат
+        if (cfg_.from_ms > 0 && wbar.timestamp < cfg_.from_ms) {
+            ++bar_index;
+            continue;
+        }
+        if (cfg_.to_ms > 0 && wbar.timestamp > cfg_.to_ms) {
+            break;
+        }
         // Слишком мало истории — пропускаем
         if (history.size() < cfg_.rolling_window) {
             ++bar_index;

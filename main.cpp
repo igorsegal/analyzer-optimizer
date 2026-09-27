@@ -82,7 +82,20 @@ static void print_report(const engine::BacktestReport& r) {
         }
     }
 }
-int main(int argc, char** argv) {
+// YYYY-MM-DD -> Unix ms UTC
+static int64_t parse_date_utc(const char* s) {
+    int y=0, mo=0, d=0;
+    if (std::sscanf(s, "%d-%d-%d", &y, &mo, &d) != 3) return 0;
+    auto days_from_civil = [](int yy, unsigned mm, unsigned dd) -> int64_t {
+        yy -= (mm <= 2);
+        const int era = (yy >= 0 ? yy : yy - 399) / 400;
+        const unsigned yoe = static_cast<unsigned>(yy - era * 400);
+        const unsigned doy = (153 * (mm + (mm > 2 ? -3 : 9)) + 2) / 5 + dd - 1;
+        const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        return static_cast<int64_t>(era) * 146097 + static_cast<int64_t>(doe) - 719468;
+    };
+    return days_from_civil(y, static_cast<unsigned>(mo), static_cast<unsigned>(d)) * 86400LL * 1000LL;
+}int main(int argc, char** argv) {
     engine::BacktestConfig cfg;
     std::string path;
     bool quiet = false;
@@ -102,6 +115,12 @@ int main(int argc, char** argv) {
             cfg.skip_irregular_prefix = false;
         } else if (a == "--max-bars" && i + 1 < argc) {
             cfg.max_bars = static_cast<std::size_t>(std::stoul(argv[++i]));
+        } else if (a == "--skip" && i + 1 < argc) {
+            cfg.skip_bars = static_cast<std::size_t>(std::stoul(argv[++i]));
+        } else if (a == "--from" && i + 1 < argc) {
+            cfg.from_ms = parse_date_utc(argv[++i]);
+        } else if (a == "--to" && i + 1 < argc) {
+            cfg.to_ms = parse_date_utc(argv[++i]);
         } else if (a == "--quiet") {
             quiet = true;
         } else if (a == "--log-every" && i + 1 < argc) {

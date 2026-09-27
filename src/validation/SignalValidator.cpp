@@ -1,5 +1,8 @@
 ﻿#include "validation/SignalValidator.h"
 #include <cmath>
+#include <algorithm>
+#include <functional>
+#include <vector>
 #include <stdexcept>
 namespace spartak::validation {
 // -----------------------------------------------------------------------------
@@ -102,20 +105,52 @@ ValidationResult SignalValidator::validate(
     if (stop_dist <= 0.0) {
         return reject(core::RejectReason::ZeroDistance, "entry == stop");
     }
-    // 8) TP: сигнал мог задать свой (например, на следующем уровне).
-    //    Если не задан -> рассчитываем 2:1 (tp_risk_ratio) от риска.
-    //    В core::PatternSignal нет отдельного take_profit — есть level.
-    //    В нашем текущем контракте используем rule: TP = entry ± (tp_risk_ratio * stop_dist).
-    const double tp_ratio = cfg_.tp_risk_ratio;
-    const double tp_dist  = stop_dist * tp_ratio;
-    const double tp1_dist = stop_dist * 1.0;    // первый тейк на 1:1
-    const double tp2_dist = tp_dist;            // второй — 2:1
-    const double tp1 = (sig.side == core::OrderSide::Buy)
-                     ? (sig.trigger_price + tp1_dist)
-                     : (sig.trigger_price - tp1_dist);
-    const double tp2 = (sig.side == core::OrderSide::Buy)
-                     ? (sig.trigger_price + tp2_dist)
-                     : (sig.trigger_price - tp2_dist);
+    // 8) TP из активных зон по направлению сделки.
+    //    BUY:  3 ближайшие зоны выше entry, сортируем по возрастанию price_level
+    //    SELL: 3 ближайшие зоны ниже entry, сортируем по убыванию price_level
+    //    Если зон меньше 3 — fallback: entry ± stop_dist * {1, 2, 3}
+    std::vector<double> tp_candidates;
+    for (const auto& z : ctx.active_zones) {
+        if (!z.is_active) continue;
+        if (sig.side == core::OrderSide::Buy && z.price_level > sig.trigger_price)
+            tp_candidates.push_back(z.price_level);
+        if (sig.side == core::OrderSide::Sell && z.price_level < sig.trigger_price)
+            tp_candidates.push_back(z.price_level);
+    }
+    if (sig.side == core::OrderSide::Buy)
+        std::sort(tp_candidates.begin(), tp_candidates.end());
+    else
+        std::sort(tp_candidates.begin(), tp_candidates.end(), std::greater<double>());
+    double tp1 = 0.0, tp2 = 0.0, tp3 = 0.0;
+    if (tp_candidates.size() >= 3) {
+        tp1 = tp_candidates[0];
+        tp2 = tp_candidates[1];
+        tp3 = tp_candidates[2];
+    } else if (tp_candidates.size() == 2) {
+        tp1 = tp_candidates[0];
+        tp2 = tp_candidates[1];
+        tp3 = (sig.side == core::OrderSide::Buy)
+            ? (sig.trigger_price + stop_dist * 3.0)
+            : (sig.trigger_price - stop_dist * 3.0);
+    } else if (tp_candidates.size() == 1) {
+        tp1 = tp_candidates[0];
+        tp2 = (sig.side == core::OrderSide::Buy)
+            ? (sig.trigger_price + stop_dist * 2.0)
+            : (sig.trigger_price - stop_dist * 2.0);
+        tp3 = (sig.side == core::OrderSide::Buy)
+            ? (sig.trigger_price + stop_dist * 3.0)
+            : (sig.trigger_price - stop_dist * 3.0);
+    } else {
+        tp1 = (sig.side == core::OrderSide::Buy)
+            ? (sig.trigger_price + stop_dist * 1.0)
+            : (sig.trigger_price - stop_dist * 1.0);
+        tp2 = (sig.side == core::OrderSide::Buy)
+            ? (sig.trigger_price + stop_dist * 2.0)
+            : (sig.trigger_price - stop_dist * 2.0);
+        tp3 = (sig.side == core::OrderSide::Buy)
+            ? (sig.trigger_price + stop_dist * 3.0)
+            : (sig.trigger_price - stop_dist * 3.0);
+    }
     // 9) Сборка финального запроса
     ValidationResult v;
     v.is_approved = true;
@@ -128,7 +163,8 @@ ValidationResult SignalValidator::validate(
     v.order.stop_loss      = sig.suggested_stop;
     v.order.take_profit_1  = tp1;
     v.order.take_profit_2  = tp2;
-    v.rr_ratio    = tp_ratio;
+    v.order.take_profit_3  = tp3;
+    v.rr_ratio    = (stop_dist > 0.0) ? ((tp3 - sig.trigger_price) / stop_dist) : 0.0;
     v.risk_amount = stop_dist * lot * cfg_.contract_size;
     return v;
 }

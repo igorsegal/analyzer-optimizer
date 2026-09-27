@@ -31,10 +31,12 @@ struct PositionState {
     double           stop_loss         = 0.0;
     double           take_profit_1     = 0.0;
     double           take_profit_2     = 0.0;
+    double           take_profit_3     = 0.0;
     int64_t          open_time_ms      = 0;
     int64_t          close_time_ms     = 0;
     int32_t          entry_spread_pts  = 0;
     bool             tp1_hit           = false;
+    bool             tp2_hit           = false;
     bool             be_moved          = false;
     bool             closed            = false;
     double           realized_pnl      = 0.0;   // сумма по частичным
@@ -60,6 +62,7 @@ public:
                            double sl,
                            double tp1,
                            double tp2,
+                           double tp3,
                            int32_t spread_pts,
                            int64_t open_time_ms) noexcept;
     // Частичное закрытие. tp1_done — отметить tp1_hit.

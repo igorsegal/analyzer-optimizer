@@ -44,6 +44,11 @@ static void print_report(const engine::BacktestReport& r) {
     std::cout << " Signals detected    : " << r.signals_detected << "\n";
     std::cout << " Orders approved     : " << r.orders_approved << "\n";
     std::cout << " Orders rejected     : " << r.orders_rejected << "\n";
+    std::cout << "   spread            : " << r.reject_spread  << "\n";
+    std::cout << "   trend             : " << r.reject_trend   << "\n";
+    std::cout << "   margin            : " << r.reject_margin  << "\n";
+    std::cout << "   session           : " << r.reject_session << "\n";
+    std::cout << "   other             : " << r.reject_other   << "\n";
     std::cout << "\n";
     std::cout << " Partial closes      : " << r.partial_closes << "\n";
     std::cout << " Full closes         : " << r.full_closes << "\n";
@@ -117,19 +122,24 @@ int main(int argc, char** argv) {
     cfg.log_every_n = log_every;
     // --- Разумные дефолты стратегии для бэктеста ---
     // Контекст: тестируем на одном ТФ
-    cfg.context.use_same_tf_for_both = true;
+    cfg.aggregate_bars = 12;   // 12 M5 = 1 H1
+    cfg.context.use_same_tf_for_both = true;   // один ТФ, всё на H1
+    cfg.context.trend_lookback       = 3;      // ТЗ: правило i-2 требует >= 3
+    cfg.pattern.pinbar_buy.min_lower_ratio  = 0.30;
+    cfg.pattern.pinbar_sell.min_upper_ratio = 0.30;
     // Паттерны: жёсткая фильтрация (только значимые бары + трендовое согласие)
-    cfg.pattern.volume.min_volume = 50;   // бар должен иметь >= 50 тиков
-    cfg.pattern.volume.avg_ratio  = 0.5;  // и >= 50% от среднего
+    cfg.pattern.volume.min_volume = 150;   // бар должен иметь >= 50 тиков
+    cfg.pattern.volume.avg_ratio  = 0.8;  // и >= 50% от среднего
     cfg.pattern.require_trend_for_consolidation = true;
     // Валидация
     cfg.validation.lot_rounder.max_lot = 1.0;       // жёсткий потолок
     cfg.validation.session.enabled     = false;     // любое время суток
+    cfg.validation.spread.max_points       = 200;
     // Позиция: трейлинг только после TP1, emergency отключён на первом прогоне
     cfg.position.use_trailing       = true;
     cfg.position.trail_only_after_tp1 = true;
     cfg.position.emergency_enabled  = false;
-    cfg.position.commission.commission_per_lot = 3.0;
+    cfg.position.commission.commission_per_lot = 5.0;
     // Trailing: расстояние 50 пунктов, активация после 100
     cfg.position.trailing.trailing_distance_points = 50;
     cfg.position.trailing.activation_points        = 100;

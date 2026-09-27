@@ -52,6 +52,7 @@ uint64_t PositionManager::openPosition(const core::ValidatedOrderRequest& order,
         order.stop_loss,
         order.take_profit_1,
         order.take_profit_2,
+        order.take_profit_3,
         spread_pts,
         open_time_ms);
     // Фиксируем день открытия для свопов
@@ -209,19 +210,40 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
         tctx.tp1     = s.take_profit_1;
         tctx.tp2     = s.take_profit_2;
         tctx.tp1_hit = s.tp1_hit;
-        tctx.tp2_hit = false;   // у нас только один tp2
+        tctx.tp2_hit = s.tp2_hit;
         auto ev = uo1_.check(bar, tctx);
         if (ev == TriggerEvent::SL_Hit) {
             events.push_back(closeFull(s, s.stop_loss, bar.timestamp, "sl"));
             continue;
         }
         if (ev == TriggerEvent::TP2_Hit) {
-            events.push_back(closeFull(s, s.take_profit_2, bar.timestamp, "tp2"));
+            // TP2: partial 25% (level=1), если tp1 уже отработал
+            if (s.tp1_hit && !s.tp2_hit) {
+                auto sr = splitter_.split(s.initial_volume, s.remaining_volume, 1);
+                if (sr.ok && !sr.full_close) {
+                    events.push_back(closePartial(s, sr.close_lot, s.take_profit_2,
+                                                  bar.timestamp, "tp2"));
+                    s.tp2_hit = true;
+                    continue;
+                }
+            }
+            // Иначе — полное закрытие
+            events.push_back(closeFull(s, s.take_profit_2, bar.timestamp, "tp2_full"));
             continue;
+        }
+        // TP3 — финальное закрытие оставшегося объёма
+        if (s.tp2_hit && s.take_profit_3 > 0.0) {
+            const bool tp3_hit = (s.side == core::OrderSide::Buy)
+                ? (bar.high >= s.take_profit_3)
+                : (bar.low  <= s.take_profit_3);
+            if (tp3_hit) {
+                events.push_back(closeFull(s, s.take_profit_3, bar.timestamp, "tp3"));
+                continue;
+            }
         }
         if (ev == TriggerEvent::TP1_Hit) {
             // Part 1: частичное закрытие
-            auto sr = splitter_.split(s.initial_volume, s.remaining_volume);
+            auto sr = splitter_.split(s.initial_volume, s.remaining_volume, 0);
             if (!sr.ok) continue;   // ничего не делаем
             if (sr.full_close) {
                 events.push_back(closeFull(s, s.take_profit_1, bar.timestamp,

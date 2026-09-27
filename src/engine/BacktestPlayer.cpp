@@ -1,4 +1,5 @@
 ﻿#include "engine/BacktestPlayer.h"
+#include "core/InstrumentRegistry.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -34,6 +35,35 @@ BacktestReport BacktestPlayer::run(const std::string& xfbar_path) {
         rep.symbol         = rd->symbol();
         rep.period_seconds = rd->header().period_seconds;
     }
+    // --- Автоконфигурация по InstrumentRegistry ---
+    if (!rep.symbol.empty()) {
+        auto spec = core::InstrumentRegistry::resolve(rep.symbol);
+        cfg_.point              = spec.point;
+        cfg_.contract_size      = spec.contract_size;
+        cfg_.leverage           = spec.leverage;
+        cfg_.commission_per_lot = spec.commission_per_lot;
+        cfg_.context.point = spec.point;
+        cfg_.pattern.point = spec.point;
+        cfg_.validation.point                 = spec.point;
+        cfg_.validation.contract_size         = spec.contract_size;
+        cfg_.validation.lot_rounder.min_lot   = spec.min_lot;
+        cfg_.validation.lot_rounder.max_lot   = spec.max_lot;
+        cfg_.validation.lot_rounder.lot_step  = spec.lot_step;
+        cfg_.validation.money.contract_size   = spec.contract_size;
+        cfg_.validation.money.point           = spec.point;
+        cfg_.validation.margin.contract_size  = spec.contract_size;
+        cfg_.position.point                 = spec.point;
+        cfg_.position.contract_size         = spec.contract_size;
+        cfg_.position.splitter.min_lot      = spec.min_lot;
+        cfg_.position.splitter.lot_step     = spec.lot_step;
+        cfg_.position.breakeven.point       = spec.point;
+        cfg_.position.swap.point            = spec.point;
+        cfg_.position.swap.contract_size    = spec.contract_size;
+        cfg_.position.swap.swap_long_points  = spec.swap_long_points;
+        cfg_.position.swap.swap_short_points = spec.swap_short_points;
+        cfg_.position.commission.commission_per_lot = spec.commission_per_lot;
+        cfg_.position.trailing.point        = spec.point;
+    }
     rep.bars_total       = stream.total_bars();
     rep.initial_balance  = cfg_.initial_balance;
     rep.final_balance    = cfg_.initial_balance;
@@ -60,13 +90,35 @@ BacktestReport BacktestPlayer::run(const std::string& xfbar_path) {
     // --- 4. Главный цикл ---
     std::vector<core::Bar> history;
     history.reserve(cfg_.rolling_window + 10);
+    std::vector<core::Bar> agg_bucket;
+    agg_bucket.reserve(cfg_.aggregate_bars);
+
     core::Bar bar;
     std::size_t bar_index = 0;
     const std::size_t max_bars =
         (cfg_.max_bars > 0) ? cfg_.max_bars : static_cast<std::size_t>(1e12);
     while (bar_index < max_bars && stream.next(bar)) {
-        history.push_back(bar);
-        // Rolling window: не даём вектору расти бесконечно
+        // --- Агрегация N исходных баров в один рабочий ---
+        agg_bucket.push_back(bar);
+        if (agg_bucket.size() < cfg_.aggregate_bars) continue;
+        core::Bar wbar{};
+        wbar.timestamp   = agg_bucket.front().timestamp;
+        wbar.open        = agg_bucket.front().open;
+        wbar.close       = agg_bucket.back().close;
+        wbar.high        = agg_bucket.front().high;
+        wbar.low         = agg_bucket.front().low;
+        wbar.tick_volume = 0;
+        int64_t spr_sum = 0;
+        for (const auto& b : agg_bucket) {
+            if (b.high > wbar.high) wbar.high = b.high;
+            if (b.low  < wbar.low)  wbar.low  = b.low;
+            wbar.tick_volume += b.tick_volume;
+            spr_sum += b.spread;
+        }
+        wbar.spread = static_cast<int32_t>(spr_sum / static_cast<int64_t>(agg_bucket.size()));
+        agg_bucket.clear();
+        history.push_back(wbar);
+        // Rolling window
         if (history.size() > cfg_.rolling_window) {
             history.erase(history.begin(),
                           history.begin() + (history.size() - cfg_.rolling_window));
@@ -87,12 +139,20 @@ BacktestReport BacktestPlayer::run(const std::string& xfbar_path) {
             if (!can_open) {
                 ++rep.orders_rejected;
             } else {
-                auto vr = validator.validate(sig, mctx, bar, account);
+                auto vr = validator.validate(sig, mctx, wbar, account);
                 if (vr.is_approved) {
                     ++rep.orders_approved;
-                    posman.openPosition(vr.order, bar.spread, bar.timestamp);
+                    posman.openPosition(vr.order, wbar.spread, wbar.timestamp);
                 } else {
                     ++rep.orders_rejected;
+                    switch (vr.reason) {
+                        case core::RejectReason::SpreadTooHigh: ++rep.reject_spread;  break;
+                        case core::RejectReason::TrendConflict: ++rep.reject_trend;   break;
+                        case core::RejectReason::MarginCall:
+                        case core::RejectReason::MarginTooLow:  ++rep.reject_margin;  break;
+                        case core::RejectReason::SessionClosed: ++rep.reject_session; break;
+                        default: ++rep.reject_other; break;
+                    }
                 }
             }
         }
@@ -101,8 +161,8 @@ BacktestReport BacktestPlayer::run(const std::string& xfbar_path) {
         pac.margin_level_pct = (account.margin_used > 0.0)
                              ? (account.equity / account.margin_used) * 100.0
                              : 1e9;
-        pac.now_ms = bar.timestamp;
-        auto events = posman.onBar(bar, pac);
+        pac.now_ms = wbar.timestamp;
+        auto events = posman.onBar(wbar, pac);
         // 4.5. Обрабатываем события: применяем к балансу
         for (const auto& e : events) {
             switch (e.type) {
@@ -142,7 +202,7 @@ BacktestReport BacktestPlayer::run(const std::string& xfbar_path) {
         for (const auto& s : posman.positions()) {
             if (!s.is_active()) continue;
             const double dir = (s.side == core::OrderSide::Buy) ? 1.0 : -1.0;
-            live_pnl += (bar.close - s.entry_price) * dir
+            live_pnl += (wbar.close - s.entry_price) * dir
                       * s.remaining_volume * cfg_.contract_size;
             margin_used += (s.remaining_volume * cfg_.contract_size) / cfg_.leverage;
         }

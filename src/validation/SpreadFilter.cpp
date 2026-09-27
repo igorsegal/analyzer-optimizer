@@ -1,4 +1,5 @@
-﻿#include "validation/SpreadFilter.h"
+﻿#include <cstdio>
+#include "validation/SpreadFilter.h"
 #include <algorithm>
 #include <stdexcept>
 namespace spartak::validation {

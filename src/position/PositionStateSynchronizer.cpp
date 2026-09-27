@@ -11,6 +11,7 @@ void PositionStateSynchronizer::markOpened(PositionState& s,
                                            double sl,
                                            double tp1,
                                            double tp2,
+                                           double tp3,
                                            int32_t spread_pts,
                                            int64_t open_time_ms) noexcept
 {

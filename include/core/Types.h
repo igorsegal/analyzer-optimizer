@@ -98,5 +98,6 @@ struct ValidatedOrderRequest {
     double    stop_loss     = 0.0;
     double    take_profit_1 = 0.0;
     double    take_profit_2 = 0.0;
+    double    take_profit_3 = 0.0;
 };
 } // namespace spartak::core

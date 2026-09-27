@@ -38,7 +38,10 @@ struct BacktestConfig {
     double  commission_per_lot = 5.0;
     double  min_margin_level_pct = 5'000.0;
     // Окно анализа
-    std::size_t rolling_window = 100;    // сколько баров подавать в ContextAggregator
+    std::size_t aggregate_bars      = 1;     // 1=M5, 3=M15, 6=M30, 12=H1, 288=D1
+    std::size_t rolling_window      = 100;   // bars (уже агрегированные)
+    std::size_t rolling_window_h1   = 50;    // H1-bars (агрегируются из M5)
+    bool        use_multi_tf        = true;  // H1-контекст + M5-сигналы
     // Пропускать ли нерегулярный префикс данных
     bool skip_irregular_prefix = true;
     int64_t max_gap_ms         = 14'400'000LL;   // 4 часа
@@ -68,6 +71,11 @@ struct BacktestReport {
     std::size_t signals_detected   = 0;
     std::size_t orders_approved    = 0;
     std::size_t orders_rejected    = 0;
+    std::size_t reject_spread      = 0;
+    std::size_t reject_trend       = 0;
+    std::size_t reject_margin      = 0;
+    std::size_t reject_session     = 0;
+    std::size_t reject_other       = 0;
     // Сделки
     std::size_t partial_closes     = 0;
     std::size_t full_closes        = 0;

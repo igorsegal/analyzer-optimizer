@@ -2,56 +2,37 @@
 #include <cmath>
 #include <stdexcept>
 namespace spartak::position {
-VolumeSplitter50::VolumeSplitter50(VolumeSplitterConfig cfg)
-    : cfg_(cfg) {
-    if (cfg_.partial_pct <= 0.0 || cfg_.partial_pct >= 1.0)
-        throw std::invalid_argument("VolumeSplitterConfig::partial_pct must be in (0,1)");
-    if (cfg_.min_lot <= 0.0)
-        throw std::invalid_argument("VolumeSplitterConfig::min_lot must be > 0");
-    if (cfg_.lot_step <= 0.0)
-        throw std::invalid_argument("VolumeSplitterConfig::lot_step must be > 0");
+VolumeSplitter50::VolumeSplitter50(VolumeSplitterConfig cfg) : cfg_(cfg) {
+    if (cfg_.min_lot <= 0.0)   throw std::invalid_argument("min_lot");
+    if (cfg_.lot_step <= 0.0)  throw std::invalid_argument("lot_step");
+    double s = 0.0;
+    for (auto p : cfg_.partial_pcts) {
+        if (p <= 0.0) throw std::invalid_argument("partial_pcts");
+        s += p;
+    }
+    if (std::fabs(s - 1.0) > 1e-6) throw std::invalid_argument("partial_pcts must sum to 1.0");
 }
-// -----------------------------------------------------------------------------
-// split — разбить объём.
-//
-// Алгоритм:
-//   1. raw_close  = initial * partial_pct
-//   2. close_lot  = floor(raw_close / step) * step
-//   3. remain_lot = floor((remaining - close_lot) / step) * step
-//   4. Если close_lot < min_lot или remain_lot < min_lot
-//         -> full_close = true, close_lot = remaining, remain_lot = 0
-//   5. Иначе ok=true, возвращаем обе части.
-// -----------------------------------------------------------------------------
-SplitResult VolumeSplitter50::split(double initial, double remaining) const noexcept {
+SplitResult VolumeSplitter50::split(double initial, double remaining, int level) const noexcept {
     SplitResult r;
     if (initial <= 0.0 || remaining <= 0.0) return r;
-    const double raw_close = initial * cfg_.partial_pct;
-    auto floor_to_step = [&](double v) {
+    if (level < 0 || level > 2) return r;
+    const double pct = cfg_.partial_pcts[level];
+    const double raw = initial * pct;
+    auto floor_step = [&](double v) {
         if (v <= 0.0) return 0.0;
-        const double steps = std::floor((v + 1e-9) / cfg_.lot_step);
-        double out = steps * cfg_.lot_step;
-        out = std::round(out * 1e8) / 1e8;
-        return out;
+        double out = std::floor((v + 1e-9) / cfg_.lot_step) * cfg_.lot_step;
+        return std::round(out * 1e8) / 1e8;
     };
-    double close_lot = floor_to_step(raw_close);
-    // Если остаток после закрытия меньше min_lot — закрываем всё
-    const double remain_raw = remaining - close_lot;
-    double remain_lot = floor_to_step(remain_raw);
-    const bool close_bad  = (close_lot + 1e-9 < cfg_.min_lot);
-    const bool remain_bad = (remain_lot + 1e-9 < cfg_.min_lot);
+    double close_lot = floor_step(raw);
+    double remain    = floor_step(remaining - close_lot);
+    const bool close_bad  = close_lot + 1e-9 < cfg_.min_lot;
+    const bool remain_bad = remain + 1e-9 < cfg_.min_lot;
     if (close_bad || remain_bad) {
-        r.ok          = true;
-        r.full_close  = true;
-        r.close_lot   = remain_lot;   // внимательно: закрываем весь остаток
-        r.remain_lot  = 0.0;
-        // В защиту от остатков, занулим и принудительно поставим весь remaining
-        r.close_lot   = remaining;
+        r.ok = true; r.full_close = true;
+        r.close_lot = remaining; r.remain_lot = 0.0;
         return r;
     }
-    r.ok          = true;
-    r.full_close  = false;
-    r.close_lot   = close_lot;
-    r.remain_lot  = remain_lot;
+    r.ok = true; r.close_lot = close_lot; r.remain_lot = remain;
     return r;
 }
 } // namespace spartak::position

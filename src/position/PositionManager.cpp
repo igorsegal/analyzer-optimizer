@@ -20,8 +20,12 @@ const char* to_string(PositionEventType t) noexcept {
 // -----------------------------------------------------------------------------
 // Конструктор.
 // -----------------------------------------------------------------------------
-PositionManager::PositionManager(PositionManagerConfig cfg)
+PositionManager::PositionManager(PositionManagerConfig cfg,
+                                 const engine::PnlCalculator* pnl,
+                                 const core::InstrumentSpec* spec)
     : cfg_(cfg),
+      pnl_(pnl),
+      spec_(spec),
       uo1_(),
       splitter_(cfg.splitter),
       breakeven_(cfg.breakeven),
@@ -77,10 +81,16 @@ PositionEvent PositionManager::closePartial(PositionState& s,
     e.volume      = close_volume;
     e.time_ms     = now_ms;
     e.reason      = std::move(reason);
-    // gross pnl
+    // gross pnl (в USD, через PnlCalculator если доступен)
     const double dir = (s.side == core::OrderSide::Buy) ? 1.0 : -1.0;
-    const double gross = (close_price - s.entry_price) * dir
-                       * close_volume * cfg_.contract_size;
+    double gross;
+    if (pnl_ && spec_) {
+        gross = pnl_->grossPnlUsd(s.side, s.entry_price, close_price,
+                                  close_volume, *spec_);
+    } else {
+        gross = (close_price - s.entry_price) * dir
+              * close_volume * cfg_.contract_size;
+    }
     // комиссия пропорциональна закрываемому объёму
     const double comm = commission_.closeCommission(close_volume);
     // своп пропорционально закрываемой доле от initial
@@ -115,8 +125,14 @@ PositionEvent PositionManager::closeFull(PositionState& s,
     e.time_ms     = now_ms;
     e.reason      = std::move(reason);
     const double dir = (s.side == core::OrderSide::Buy) ? 1.0 : -1.0;
-    const double gross = (close_price - s.entry_price) * dir
-                       * s.remaining_volume * cfg_.contract_size;
+    double gross;
+    if (pnl_ && spec_) {
+        gross = pnl_->grossPnlUsd(s.side, s.entry_price, close_price,
+                                  s.remaining_volume, *spec_);
+    } else {
+        gross = (close_price - s.entry_price) * dir
+              * s.remaining_volume * cfg_.contract_size;
+    }
     const double comm = commission_.closeCommission(s.remaining_volume);
     const double swap_part = s.total_swap;
     e.gross_pnl  = gross;

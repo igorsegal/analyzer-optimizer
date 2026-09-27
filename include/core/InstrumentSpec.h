@@ -45,5 +45,15 @@ struct InstrumentSpec {
     [[nodiscard]] double point_cost_per_lot() const noexcept {
         return point * contract_size;
     }
+    // --- Валюты (для конвертации PnL в валюту депозита) ---
+    // Заполняются InstrumentRegistry::storage() автоматически.
+    std::string        base_currency  = "EUR";   // что покупаем
+    std::string        quote_currency = "USD";   // чем платим
+    // --- Per-instrument distances (зависят от масштаба цены) ---
+    // Для forex-majors: 30 пунктов = ~0.0003 цены.
+    // Для золота: 300 пунктов = $3 = 0.2% цены.
+    // Заполняются InstrumentRegistry::storage() по категориям.
+    int                stop_buffer_points       = 30;
+    int                trailing_distance_points = 30;
 };
 } // namespace spartak::core

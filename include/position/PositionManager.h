@@ -17,6 +17,8 @@
 // =============================================================================
 #pragma once
 #include "core/Types.h"
+#include "core/InstrumentSpec.h"
+#include "engine/PnlCalculator.h"
 #include "position/UO1Trigger.h"
 #include "position/VolumeSplitter50.h"
 #include "position/BreakEvenTransfer.h"
@@ -86,7 +88,9 @@ struct PositionAccountContext {
 // -----------------------------------------------------------------------------
 class PositionManager {
 public:
-    explicit PositionManager(PositionManagerConfig cfg = {});
+    explicit PositionManager(PositionManagerConfig cfg = {},
+                             const engine::PnlCalculator* pnl = nullptr,
+                             const core::InstrumentSpec* spec = nullptr);
     // Открыть позицию из ValidatedOrderRequest.
     uint64_t openPosition(const core::ValidatedOrderRequest& order,
                           int32_t spread_pts,
@@ -108,6 +112,8 @@ public:
     const PositionManagerConfig& config() const noexcept { return cfg_; }
 private:
     PositionManagerConfig          cfg_;
+    const engine::PnlCalculator*   pnl_  = nullptr;
+    const core::InstrumentSpec*    spec_ = nullptr;
     std::vector<PositionState>     positions_;
     uint64_t                       next_id_ = 1;
     double                         total_realized_pnl_ = 0.0;   // аккумулированный PnL

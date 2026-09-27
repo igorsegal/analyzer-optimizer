@@ -50,6 +50,8 @@ add_library(spartak_core STATIC
     src/position/PositionStateSynchronizer.cpp
     src/position/EmergencyCloseHandler.cpp
     src/position/PositionManager.cpp
+    src/engine/QuoteRateProvider.cpp
+    src/engine/PnlCalculator.cpp
     src/engine/BacktestPlayer.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

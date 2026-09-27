@@ -14,6 +14,80 @@ const char* to_string(InstrumentCategory c) noexcept {
     }
     return "?";
 }
+// Хелпер: заполнить base/quote из имени пары (XXXYYY)
+static void fill_ccy(InstrumentSpec& s) {
+    const auto& u = s.symbol;
+    if (u.size() == 6 &&
+        std::isalpha((unsigned char)u[0]) &&
+        std::isalpha((unsigned char)u[3])) {
+        s.base_currency  = u.substr(0, 3);
+        s.quote_currency = u.substr(3, 3);
+    }
+}
+// Хелпер: заполнить stop_buffer_points / trailing_distance_points по категории и масштабу цены.
+// Логика: дистанции должны быть в единицах, сопоставимых с масштабом цены инструмента.
+static void fill_distances(InstrumentSpec& s) {
+    const auto& cat = s.category;
+    // Для forex-пар масштаб одинаковый — используем базовые 30.
+    if (cat == InstrumentCategory::ForexMajor || cat == InstrumentCategory::ForexCross) {
+        s.stop_buffer_points       = 30;
+        s.trailing_distance_points = 30;
+        return;
+    }
+    // Металлы: золото в 1000x больше forex, серебро в 100x.
+    if (cat == InstrumentCategory::Metal) {
+        if (s.symbol.rfind("XAU", 0) == 0) {
+            s.stop_buffer_points       = 300;
+            s.trailing_distance_points = 300;
+        } else if (s.symbol.rfind("XAG", 0) == 0) {
+            s.stop_buffer_points       = 50;
+            s.trailing_distance_points = 50;
+        } else {
+            s.stop_buffer_points       = 300;
+            s.trailing_distance_points = 300;
+        }
+        return;
+    }
+    // Индексы: SP500 ~ 2000-4000, DE40 ~ 10000-15000, etc.
+    if (cat == InstrumentCategory::Index) {
+        const std::string& u = s.symbol;
+        if (u == "SP500" || u == "NAS100" || u == "DJ30" || u == "US2000" ||
+            u == "US30"  || u == "US500" || u == "HK50") {
+            s.stop_buffer_points       = 100;
+            s.trailing_distance_points = 100;
+        } else if (u == "DE40" || u == "FRA40" || u == "EU50" || u == "UK100" ||
+                   u == "SWI20" || u == "ES35" || u == "NETH25") {
+            s.stop_buffer_points       = 300;
+            s.trailing_distance_points = 300;
+        } else if (u == "Nikkei225" || u == "CHINA50" || u == "CHINAH" ||
+                   u == "HKTECH"   || u == "SPI200"  || u == "SA40"  ||
+                   u == "SGP20"    || u == "TWINDEX" || u == "BVSPX") {
+            s.stop_buffer_points       = 500;
+            s.trailing_distance_points = 500;
+        } else {
+            s.stop_buffer_points       = 200;
+            s.trailing_distance_points = 200;
+        }
+        return;
+    }
+    // Крипта: огромный масштаб цены.
+    if (cat == InstrumentCategory::Crypto) {
+        if (s.symbol.find("BTC") != std::string::npos) {
+            s.stop_buffer_points       = 5000;
+            s.trailing_distance_points = 5000;
+        } else if (s.symbol.find("ETH") != std::string::npos) {
+            s.stop_buffer_points       = 500;
+            s.trailing_distance_points = 500;
+        } else {
+            s.stop_buffer_points       = 500;
+            s.trailing_distance_points = 500;
+        }
+        return;
+    }
+    // Товары / прочее: средний масштаб.
+    s.stop_buffer_points       = 100;
+    s.trailing_distance_points = 100;
+}
 std::vector<InstrumentSpec>& InstrumentRegistry::storage() {
     static std::vector<InstrumentSpec> s = {
         { "EURUSD", InstrumentCategory::ForexMajor, 0.00001, 5, 100000.0, 0.01, 50.0, 0.01, 12, -7.2, -1.8, 5.0, 500.0 },
@@ -35,6 +109,70 @@ std::vector<InstrumentSpec>& InstrumentRegistry::storage() {
         { "BWXT",   InstrumentCategory::Stock, 0.01,    2, 1.0,       0.01, 1000.0, 0.01, 2, 0.0, 0.0, 1.0, 5.0 },
         { "AAPL",   InstrumentCategory::Stock, 0.01,    2, 1.0,       0.01, 1000.0, 0.01, 2, 0.0, 0.0, 1.0, 5.0 },
     };
+    // Автозаполнение base/quote для forex-пар и крипты (по имени символа)
+    static bool initialized = false;
+    if (!initialized) {
+        for (auto& spec : s) {
+            const auto& u = spec.symbol;
+            // Forex / крипта: XXXYYY  (6 символов, буквы)
+            if (u.size() == 6 &&
+                std::isalpha((unsigned char)u[0]) &&
+                std::isalpha((unsigned char)u[3])) {
+                // Пропускаем BTCUSDT (quote = USDT -> приравниваем к USD)
+                if (u == "BTCUSDT" || u == "ETHUSDT" || u == "XRPUSDT" ||
+                    u == "DOGEUSDT" || u == "ADAUSDT" || u == "SOLUSDT") {
+                    spec.base_currency  = u.substr(0, u.size() - 4); // BTC, ETH...
+                    spec.quote_currency = "USD";                      // USDT ~ USD
+                } else {
+                    spec.base_currency  = u.substr(0, 3);
+                    spec.quote_currency = u.substr(3, 3);
+                }
+            }
+            // Металлы и индексы — уже заданы выше через symbol, ставим USD
+            else if (u.rfind("XAU", 0) == 0 || u.rfind("XAG", 0) == 0 ||
+                     u.rfind("XPD", 0) == 0 || u.rfind("XPT", 0) == 0) {
+                spec.base_currency  = u.substr(0, 3);
+                spec.quote_currency = u.size() > 3 ? u.substr(3) : "USD";
+            }
+            else if (u == "SP500" || u == "NAS100" || u == "DJ30" || u == "US2000" ||
+                     u == "US30"  || u == "US500"  || u == "HK50" || u == "CHINA50" ||
+                     u == "CHINAH"|| u == "HKTECH" || u == "BVSPX" || u == "TWINDEX") {
+                spec.base_currency  = u;
+                spec.quote_currency = (u == "HK50" || u == "CHINAH" || u == "HKTECH") ? "HKD"
+                                    : (u == "CHINA50" ? "CNH" : "USD");
+            }
+            else if (u == "DE40" || u == "FRA40" || u == "EU50" || u == "ES35" ||
+                     u == "SWI20" || u == "NETH25") {
+                spec.base_currency  = u;
+                spec.quote_currency = "EUR";
+            }
+            else if (u == "UK100") {
+                spec.base_currency = u; spec.quote_currency = "GBP";
+            }
+            else if (u == "Nikkei225" || u == "JP225") {
+                spec.base_currency = u; spec.quote_currency = "JPY";
+            }
+            else if (u == "SPI200") {
+                spec.base_currency = u; spec.quote_currency = "AUD";
+            }
+            else if (u == "SA40") {
+                spec.base_currency = u; spec.quote_currency = "ZAR";
+            }
+            else if (u == "SGP20") {
+                spec.base_currency = u; spec.quote_currency = "SGD";
+            }
+            // Товары
+            else if (u == "UKOUSD" || u == "USOUSD" || u == "COPPER-C" ||
+                     u == "GAS-C"   || u == "NG-C"    || u == "CL" ||
+                     u == "Cocoa-C" || u == "Coffee-C"|| u == "Cotton-C" ||
+                     u == "Sugar-C" || u == "Wheat-C" || u == "Soybean-C" ||
+                     u == "OJ-C"    || u == "GASOIL-C") {
+                spec.base_currency  = u;
+                spec.quote_currency = "USD";
+            }
+        }
+        initialized = true;
+    }
     return s;
 }
 std::optional<InstrumentSpec>
@@ -139,8 +277,12 @@ InstrumentSpec InstrumentRegistry::infer(const std::string& symbol) {
     return s;
 }
 InstrumentSpec InstrumentRegistry::resolve(const std::string& symbol) {
-    if (auto exact = lookup(symbol)) return *exact;
-    return infer(symbol);
+    InstrumentSpec s;
+    if (auto exact = lookup(symbol)) s = *exact;
+    else                             s = infer(symbol);
+    fill_ccy(s);         // base/quote по имени
+    fill_distances(s);   // stop/trail по категории
+    return s;
 }
 void InstrumentRegistry::registerSpec(const InstrumentSpec& spec) {
     auto& v = storage();

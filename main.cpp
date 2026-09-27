@@ -188,9 +188,7 @@ static int64_t parse_date_utc(const char* s) {
     std::cout << "Window  : " << cfg.rolling_window << " bars\n\n";
     // --- Прогон ---
     try {
-        std::cout << "[DIAG] wick=" << cfg.pattern.pinbar_buy.min_lower_ratio
-              << " trail=" << cfg.position.trailing.trailing_distance_points
-              << " agg=" << cfg.aggregate_bars << "\n";
+    
     engine::BacktestPlayer player(cfg);
         auto report = player.run(path);
         if (!report.ok) {

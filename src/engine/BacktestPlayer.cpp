@@ -1,5 +1,7 @@
 ﻿#include "engine/BacktestPlayer.h"
 #include "core/InstrumentRegistry.h"
+#include "engine/PnlCalculator.h"
+#include "engine/QuoteRateProvider.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -52,6 +54,12 @@ BacktestReport BacktestPlayer::run(const std::string& xfbar_path) {
         cfg_.validation.money.contract_size   = spec.contract_size;
         cfg_.validation.money.point           = spec.point;
         cfg_.validation.margin.contract_size  = spec.contract_size;
+        // --- Per-instrument distances (stop buffer + trailing) ---
+        cfg_.pattern.pinbar_buy.stop_buffer_points   = spec.stop_buffer_points;
+        cfg_.pattern.pinbar_sell.stop_buffer_points  = spec.stop_buffer_points;
+        cfg_.pattern.engulfing.stop_buffer_points    = spec.stop_buffer_points;
+        cfg_.pattern.impulse.stop_buffer_points      = spec.stop_buffer_points;
+        cfg_.position.trailing.trailing_distance_points = spec.trailing_distance_points;
         cfg_.position.point                 = spec.point;
         cfg_.position.contract_size         = spec.contract_size;
         cfg_.position.splitter.min_lot      = spec.min_lot;
@@ -86,7 +94,16 @@ BacktestReport BacktestPlayer::run(const std::string& xfbar_path) {
     account.commission_per_lot   = cfg_.commission_per_lot;
     account.min_margin_level_pct = cfg_.min_margin_level_pct;
     validation::SignalValidator validator(cfg_.validation);
-    position::PositionManager   posman(cfg_.position);
+    // PnL калькулятор с курсами валют (единый источник конверсии в USD)
+    engine::QuoteRateProvider rate_provider = engine::QuoteRateProvider::makeDefault();
+    engine::PnlCalculator     pnl_calc(rate_provider);
+    // Сохраняем spec в локальную переменную, чтобы передать в PositionManager
+    core::InstrumentSpec spec_local;
+    if (!rep.symbol.empty()) {
+        spec_local = core::InstrumentRegistry::resolve(rep.symbol);
+    }
+    
+    position::PositionManager posman(cfg_.position, &pnl_calc, &spec_local);
     // --- 4. Главный цикл ---
     std::vector<core::Bar> history;
     history.reserve(cfg_.rolling_window + 10);

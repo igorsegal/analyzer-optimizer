@@ -87,6 +87,8 @@ int main(int argc, char** argv) {
     std::string path;
     bool quiet = false;
     std::size_t log_every = 0;
+    bool agg_set = false;
+    bool wick_set = false;
     // --- Парсинг аргументов ---
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -104,6 +106,22 @@ int main(int argc, char** argv) {
             quiet = true;
         } else if (a == "--log-every" && i + 1 < argc) {
             log_every = static_cast<std::size_t>(std::stoul(argv[++i]));
+        } else if (a == "--aggregate" && i + 1 < argc) {
+            cfg.aggregate_bars = static_cast<std::size_t>(std::stoul(argv[++i])); agg_set = true;
+        } else if (a == "--trail-dist" && i + 1 < argc) {
+            cfg.position.trailing.trailing_distance_points = std::stoi(argv[++i]);
+        } else if (a == "--trail-act" && i + 1 < argc) {
+            cfg.position.trailing.activation_points = std::stoi(argv[++i]);
+        } else if (a == "--wick" && i + 1 < argc) {
+            double w = std::stod(argv[++i]);
+            cfg.pattern.pinbar_buy.min_lower_ratio  = w;
+            cfg.pattern.pinbar_sell.min_upper_ratio = w;
+            wick_set = true;
+        } else if (a == "--zones" && i + 1 < argc) {
+            cfg.context.max_zones_per_tf = static_cast<std::size_t>(std::stoul(argv[++i]));
+        } else if (a == "--risk" && i + 1 < argc) {
+            cfg.validation.risk_percent = std::stod(argv[++i]);
+            cfg.validation.money.risk_percent = cfg.validation.risk_percent;
         } else if (a == "--help" || a == "-h") {
             print_usage();
             return 0;
@@ -122,11 +140,12 @@ int main(int argc, char** argv) {
     cfg.log_every_n = log_every;
     // --- Разумные дефолты стратегии для бэктеста ---
     // Контекст: тестируем на одном ТФ
-    cfg.aggregate_bars = 12;   // 12 M5 = 1 H1
+    if (!agg_set) cfg.aggregate_bars = 12;   // дефолт H1
+    cfg.context.max_zones_per_tf = 8;
     cfg.context.use_same_tf_for_both = true;   // один ТФ, всё на H1
     cfg.context.trend_lookback       = 3;      // ТЗ: правило i-2 требует >= 3
-    cfg.pattern.pinbar_buy.min_lower_ratio  = 0.30;
-    cfg.pattern.pinbar_sell.min_upper_ratio = 0.30;
+    if (!wick_set) cfg.pattern.pinbar_buy.min_lower_ratio  = 0.30;
+    if (!wick_set) cfg.pattern.pinbar_sell.min_upper_ratio = 0.30;
     // Паттерны: жёсткая фильтрация (только значимые бары + трендовое согласие)
     cfg.pattern.volume.min_volume = 150;   // бар должен иметь >= 50 тиков
     cfg.pattern.volume.avg_ratio  = 0.8;  // и >= 50% от среднего
@@ -141,8 +160,8 @@ int main(int argc, char** argv) {
     cfg.position.emergency_enabled  = false;
     cfg.position.commission.commission_per_lot = 5.0;
     // Trailing: расстояние 50 пунктов, активация после 100
-    cfg.position.trailing.trailing_distance_points = 50;
-    cfg.position.trailing.activation_points        = 100;
+    if (!cfg.position.trailing.trailing_distance_points) cfg.position.trailing.trailing_distance_points = 50;
+    if (!cfg.position.trailing.activation_points) cfg.position.trailing.activation_points = 100;
     std::cout << "=== SPARTAK Backtest Player ===\n";
     std::cout << "File    : " << path << "\n";
     std::cout << "Balance : $" << std::fixed << std::setprecision(2)
@@ -150,7 +169,10 @@ int main(int argc, char** argv) {
     std::cout << "Window  : " << cfg.rolling_window << " bars\n\n";
     // --- Прогон ---
     try {
-        engine::BacktestPlayer player(cfg);
+        std::cout << "[DIAG] wick=" << cfg.pattern.pinbar_buy.min_lower_ratio
+              << " trail=" << cfg.position.trailing.trailing_distance_points
+              << " agg=" << cfg.aggregate_bars << "\n";
+    engine::BacktestPlayer player(cfg);
         auto report = player.run(path);
         if (!report.ok) {
             std::cerr << "Backtest failed: " << report.error << "\n";

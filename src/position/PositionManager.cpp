@@ -2,7 +2,9 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+
 namespace spartak::position {
+
 // -----------------------------------------------------------------------------
 // to_string(PositionEventType)
 // -----------------------------------------------------------------------------
@@ -17,6 +19,7 @@ const char* to_string(PositionEventType t) noexcept {
     }
     return "Unknown";
 }
+
 // -----------------------------------------------------------------------------
 // Конструктор.
 // -----------------------------------------------------------------------------
@@ -39,6 +42,7 @@ PositionManager::PositionManager(PositionManagerConfig cfg,
     if (cfg_.contract_size <= 0.0)
         throw std::invalid_argument("PositionManagerConfig::contract_size must be > 0");
 }
+
 // -----------------------------------------------------------------------------
 // openPosition
 // -----------------------------------------------------------------------------
@@ -59,11 +63,11 @@ uint64_t PositionManager::openPosition(const core::ValidatedOrderRequest& order,
         order.take_profit_3,
         spread_pts,
         open_time_ms);
-    // Фиксируем день открытия для свопов
     s.last_swap_day = SwapAccrualTracker::day_of(open_time_ms);
     positions_.push_back(s);
     return s.id;
 }
+
 // -----------------------------------------------------------------------------
 // closePartial — частичное закрытие.
 // -----------------------------------------------------------------------------
@@ -81,7 +85,7 @@ PositionEvent PositionManager::closePartial(PositionState& s,
     e.volume      = close_volume;
     e.time_ms     = now_ms;
     e.reason      = std::move(reason);
-    // gross pnl (в USD, через PnlCalculator если доступен)
+
     const double dir = (s.side == core::OrderSide::Buy) ? 1.0 : -1.0;
     double gross;
     if (pnl_ && spec_) {
@@ -91,23 +95,30 @@ PositionEvent PositionManager::closePartial(PositionState& s,
         gross = (close_price - s.entry_price) * dir
               * close_volume * cfg_.contract_size;
     }
-    // комиссия пропорциональна закрываемому объёму
+
     const double comm = commission_.closeCommission(close_volume);
-    // своп пропорционально закрываемой доле от initial
+
+    // Спред как издержка: round-trip, списывается пропорционально объёму.
+    const double spread_cost = static_cast<double>(s.entry_spread_pts)
+                             * cfg_.point * close_volume * cfg_.contract_size;
+
     const double portion = (s.initial_volume > 0.0)
                          ? (close_volume / s.initial_volume)
                          : 0.0;
     const double swap_part = s.total_swap * portion;
+
     e.gross_pnl  = gross;
     e.commission = comm;
     e.swap       = swap_part;
-    e.net_pnl    = gross - comm - swap_part;
+    e.net_pnl    = gross - comm - swap_part - spread_cost;
+
     const bool tp1_done = (e.reason == "tp1");
     PositionStateSynchronizer::markPartialClose(
         s, close_volume, close_price, gross, comm, swap_part, tp1_done);
     total_realized_pnl_ += e.net_pnl;
     return e;
 }
+
 // -----------------------------------------------------------------------------
 // closeFull — полное закрытие.
 // -----------------------------------------------------------------------------
@@ -124,6 +135,7 @@ PositionEvent PositionManager::closeFull(PositionState& s,
     e.volume      = s.remaining_volume;
     e.time_ms     = now_ms;
     e.reason      = std::move(reason);
+
     const double dir = (s.side == core::OrderSide::Buy) ? 1.0 : -1.0;
     double gross;
     if (pnl_ && spec_) {
@@ -133,17 +145,26 @@ PositionEvent PositionManager::closeFull(PositionState& s,
         gross = (close_price - s.entry_price) * dir
               * s.remaining_volume * cfg_.contract_size;
     }
+
     const double comm = commission_.closeCommission(s.remaining_volume);
+
+    // Спред как издержка.
+    const double spread_cost = static_cast<double>(s.entry_spread_pts)
+                             * cfg_.point * s.remaining_volume * cfg_.contract_size;
+
     const double swap_part = s.total_swap;
+
     e.gross_pnl  = gross;
     e.commission = comm;
     e.swap       = swap_part;
-    e.net_pnl    = gross - comm - swap_part;
+    e.net_pnl    = gross - comm - swap_part - spread_cost;
+
     PositionStateSynchronizer::markFullClose(
         s, close_price, gross, comm, swap_part, now_ms, e.reason);
     total_realized_pnl_ += e.net_pnl;
     return e;
 }
+
 // -----------------------------------------------------------------------------
 // moveStop — BE или trail.
 // -----------------------------------------------------------------------------
@@ -158,22 +179,16 @@ PositionEvent PositionManager::moveStop(PositionState& s,
                           : PositionEventType::TrailingMove;
     e.position_id = s.id;
     e.side        = s.side;
-    e.price       = s.entry_price;   // не используется, но информативно
+    e.price       = s.entry_price;
     e.new_sl      = new_sl;
     e.time_ms     = now_ms;
     e.reason      = std::move(reason);
     PositionStateSynchronizer::markStopMoved(s, new_sl, is_be);
     return e;
 }
+
 // -----------------------------------------------------------------------------
 // onBar — главный цикл.
-//
-// Для каждой активной позиции:
-//   1. Emergency check (margin / drawdown / max holding)
-//   2. Swap accrual (полночь)
-//   3. UO1Trigger — что произошло на баре?
-//   4. Обработка событий: SL -> FullClose, TP2 -> FullClose, TP1 -> partial + BE
-//   5. Trailing (если включён и TP1 не сработал — трейлинг ДО TP1 = защита)
 // -----------------------------------------------------------------------------
 std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
                                                   const PositionAccountContext& acc)
@@ -181,13 +196,12 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
     std::vector<PositionEvent> events;
     for (auto& s : positions_) {
         if (!s.is_active()) continue;
-        // --- 0. Emergency check ---
+
         if (cfg_.emergency_enabled) {
             EmergencyContext ectx;
             ectx.margin_level_pct = acc.margin_level_pct;
             ectx.risk_money       = std::fabs(s.entry_price - s.stop_loss)
                                   * s.initial_volume * cfg_.contract_size;
-            // current_pnl: считаем приблизительно по mid-цене close
             const double dir = (s.side == core::OrderSide::Buy) ? 1.0 : -1.0;
             ectx.current_pnl = (bar.close - s.entry_price) * dir
                              * s.remaining_volume * cfg_.contract_size
@@ -202,7 +216,7 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
                 continue;
             }
         }
-        // --- 1. Swap accrual ---
+
         {
             auto acc_res = swap_tracker_.compute(
                 s.side, s.remaining_volume, s.last_swap_day, bar.timestamp);
@@ -219,7 +233,7 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
                 events.push_back(e);
             }
         }
-        // --- 2. UO1 trigger ---
+
         TriggerContext tctx;
         tctx.side    = s.side;
         tctx.sl      = s.stop_loss;
@@ -228,12 +242,12 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
         tctx.tp1_hit = s.tp1_hit;
         tctx.tp2_hit = s.tp2_hit;
         auto ev = uo1_.check(bar, tctx);
+
         if (ev == TriggerEvent::SL_Hit) {
             events.push_back(closeFull(s, s.stop_loss, bar.timestamp, "sl"));
             continue;
         }
         if (ev == TriggerEvent::TP2_Hit) {
-            // TP2: partial 25% (level=1), если tp1 уже отработал
             if (s.tp1_hit && !s.tp2_hit) {
                 auto sr = splitter_.split(s.initial_volume, s.remaining_volume, 1);
                 if (sr.ok && !sr.full_close) {
@@ -243,11 +257,10 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
                     continue;
                 }
             }
-            // Иначе — полное закрытие
             events.push_back(closeFull(s, s.take_profit_2, bar.timestamp, "tp2_full"));
             continue;
         }
-        // TP3 — финальное закрытие оставшегося объёма
+
         if (s.tp2_hit && s.take_profit_3 > 0.0) {
             const bool tp3_hit = (s.side == core::OrderSide::Buy)
                 ? (bar.high >= s.take_profit_3)
@@ -257,10 +270,10 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
                 continue;
             }
         }
+
         if (ev == TriggerEvent::TP1_Hit) {
-            // Part 1: частичное закрытие
             auto sr = splitter_.split(s.initial_volume, s.remaining_volume, 0);
-            if (!sr.ok) continue;   // ничего не делаем
+            if (!sr.ok) continue;
             if (sr.full_close) {
                 events.push_back(closeFull(s, s.take_profit_1, bar.timestamp,
                                            "tp1_full"));
@@ -268,7 +281,6 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
             }
             events.push_back(closePartial(s, sr.close_lot, s.take_profit_1,
                                           bar.timestamp, "tp1"));
-            // Part 2: BE
             auto be_res = breakeven_.compute(
                 s.side, s.entry_price, s.take_profit_1,
                 s.entry_spread_pts, s.stop_loss);
@@ -277,7 +289,7 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
             }
             continue;
         }
-        // --- 3. Trailing (только после TP1, если флаг включён) ---
+
         const bool trailing_allowed =
             cfg_.use_trailing
          && (!cfg_.trail_only_after_tp1 || s.tp1_hit);
@@ -290,15 +302,16 @@ std::vector<PositionEvent> PositionManager::onBar(const core::Bar& bar,
             }
         }
     }
-    // Удаляем закрытые
+
     positions_.erase(
         std::remove_if(positions_.begin(), positions_.end(),
                        [](const PositionState& s) { return s.closed; }),
         positions_.end());
     return events;
 }
+
 // -----------------------------------------------------------------------------
-// forceClose — ручное/принудительное закрытие.
+// forceClose
 // -----------------------------------------------------------------------------
 PositionEvent PositionManager::forceClose(uint64_t id,
                                           double price,
@@ -315,6 +328,7 @@ PositionEvent PositionManager::forceClose(uint64_t id,
         positions_.end());
     return e;
 }
+
 // -----------------------------------------------------------------------------
 // Доступ.
 // -----------------------------------------------------------------------------
@@ -323,18 +337,19 @@ std::size_t PositionManager::activeCount() const noexcept {
     for (const auto& s : positions_) if (s.is_active()) ++n;
     return n;
 }
+
 const PositionState* PositionManager::find(uint64_t id) const noexcept {
     auto it = std::find_if(positions_.begin(), positions_.end(),
                            [id](const PositionState& s) { return s.id == id; });
     return (it == positions_.end()) ? nullptr : &(*it);
 }
+
 double PositionManager::realizedTotal() const noexcept {
-    // Возвращаем глобальный аккумулятор (закрытые сделки уже удалены).
-    // Дополнительно прибавляем PnL по ещё открытым позициям.
     double live = 0.0;
     for (const auto& s : positions_) {
         live += PositionStateSynchronizer::netPnl(s);
     }
     return total_realized_pnl_ + live;
 }
+
 } // namespace spartak::position

@@ -1,13 +1,16 @@
 ﻿cmake_minimum_required(VERSION 3.20)
 project(SPARTAK LANGUAGES CXX)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
 if (MSVC)
     add_compile_options(/W4 /permissive- /utf-8 /wd4996 /wd4834)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -O2)
 endif()
+
 add_library(spartak_core STATIC
     src/core/Config.cpp
     src/core/InstrumentRegistry.cpp
@@ -57,17 +60,23 @@ add_library(spartak_core STATIC
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
+
 # -----------------------------------------------------------------------------
 #  Main executable
 # -----------------------------------------------------------------------------
 add_executable(spartak main.cpp)
 target_link_libraries(spartak PRIVATE spartak_core)
+
 # -----------------------------------------------------------------------------
 #  Tools
 # -----------------------------------------------------------------------------
 add_executable(csv2xfbar tools/csv2xfbar.cpp)
+
+add_executable(portfolio_runner tools/portfolio_runner.cpp)
+target_link_libraries(portfolio_runner PRIVATE spartak_core)
+
 # -----------------------------------------------------------------------------
-#  Smoke tests (temporary)
+#  Smoke tests
 # -----------------------------------------------------------------------------
 add_executable(smoke_data         smoke_data.cpp)
 add_executable(smoke_file         smoke_file.cpp)
@@ -97,14 +106,12 @@ add_executable(smoke_session      smoke_session.cpp)
 add_executable(smoke_slippage     smoke_slippage.cpp)
 add_executable(smoke_validator    smoke_validator.cpp)
 add_executable(smoke_trigger      smoke_trigger.cpp)
-# add_executable(smoke_splitter smoke_splitter.cpp) [disabled: API change]
 add_executable(smoke_breakeven    smoke_breakeven.cpp)
 add_executable(smoke_swap         smoke_swap.cpp)
 add_executable(smoke_commission   smoke_commission.cpp)
 add_executable(smoke_trailing     smoke_trailing.cpp)
-# add_executable(smoke_sync smoke_sync.cpp) [disabled: API change]
 add_executable(smoke_emergency    smoke_emergency.cpp)
-# add_executable(smoke_manager smoke_manager.cpp) [disabled: API change]
+
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
 target_link_libraries(smoke_sanitize     PRIVATE spartak_core)
@@ -133,12 +140,10 @@ target_link_libraries(smoke_session      PRIVATE spartak_core)
 target_link_libraries(smoke_slippage     PRIVATE spartak_core)
 target_link_libraries(smoke_validator    PRIVATE spartak_core)
 target_link_libraries(smoke_trigger      PRIVATE spartak_core)
-# target_link_libraries(smoke_splitter PRIVATE spartak_core) [disabled]
 target_link_libraries(smoke_breakeven    PRIVATE spartak_core)
 target_link_libraries(smoke_swap         PRIVATE spartak_core)
 target_link_libraries(smoke_commission   PRIVATE spartak_core)
 target_link_libraries(smoke_trailing     PRIVATE spartak_core)
-# target_link_libraries(smoke_sync PRIVATE spartak_core) [disabled]
 target_link_libraries(smoke_emergency    PRIVATE spartak_core)
-# target_link_libraries(smoke_manager PRIVATE spartak_core) [disabled]
+
 enable_testing()

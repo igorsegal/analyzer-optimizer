@@ -22,8 +22,11 @@ struct PortfolioConfig {
     double  risk_percent              = 0.5;
     double  min_margin_level_pct      = 2'000.0;
     double  min_rr                    = 1.34;
+    double  spread_mult               = 1.0;
+    double  commission_mult           = 1.0;
     std::size_t aggregate_bars        = 1;
     bool    verbose                   = true;
+    bool    compound_sizing           = false;
     bool    skip_false_breakout       = true;
     bool    skip_impulse_buy          = true;
     bool    skip_impulse_sell         = true;
@@ -65,6 +68,20 @@ struct PortfolioReport {
     double  net_pnl          = 0.0;
     int64_t first_time_ms    = 0;
     int64_t last_time_ms     = 0;
+
+    double      max_daily_dd_pct = 0.0;
+    std::string worst_day;
+
+    std::size_t total_months     = 0;
+    std::size_t months_positive  = 0;
+    std::size_t months_negative  = 0;
+    std::size_t months_flat      = 0;
+    double      worst_month_usd  = 0.0;
+    double      best_month_usd   = 0.0;
+    double      avg_month_usd    = 0.0;
+    double      worst_month_pct  = 0.0;
+    double      best_month_pct   = 0.0;
+    double      avg_month_pct    = 0.0;
 
     struct InstrumentResult {
         std::string symbol;

@@ -11,8 +11,10 @@
 #include <memory>
 #include <stdexcept>
 #include <unordered_map>
+#include <map>
 #include <cstdint>
 #include <ctime>
+#include <cstdio>
 
 namespace spartak::engine {
 namespace {
@@ -26,11 +28,8 @@ struct Slot {
     bool                    has_bar   = false;
     core::Bar               current_bar{};
 
-    // История сигнального ТФ (bars raw) — вход в паттерн.
     std::vector<core::Bar>  sig_history;
-    // История контекстного ТФ (aggregated) — вход в контекст.
     std::vector<core::Bar>  ctx_history;
-    // Аккумулятор для склейки N сигнальных баров в один контекстный.
     core::Bar               ctx_accum{};
     std::size_t             ctx_count = 0;
     bool                    ctx_accum_active = false;
@@ -64,18 +63,37 @@ bool skip_signal(const core::PatternSignal& sig, const PortfolioConfig& cfg) {
     return false;
 }
 
-int year_from_ms(int64_t ms) {
+void to_utc(int64_t ms, std::tm& out) {
     std::time_t secs = static_cast<std::time_t>(ms / 1000);
-    std::tm tm{};
 #if defined(_MSC_VER)
-    gmtime_s(&tm, &secs);
+    gmtime_s(&out, &secs);
 #else
-    gmtime_r(&secs, &tm);
+    gmtime_r(&secs, &out);
 #endif
+}
+
+int year_from_ms(int64_t ms) {
+    std::tm tm{};
+    to_utc(ms, tm);
     return tm.tm_year + 1900;
 }
 
-// Склейка одного сигнального бара в аккумулятор контекстного ТФ.
+int day_key_from_ms(int64_t ms) { return static_cast<int>(ms / (86400LL * 1000LL)); }
+int month_key_from_ms(int64_t ms) {
+    std::tm tm{};
+    to_utc(ms, tm);
+    return (tm.tm_year + 1900) * 12 + tm.tm_mon;
+}
+
+std::string day_str_from_ms(int64_t ms) {
+    std::tm tm{};
+    to_utc(ms, tm);
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d",
+                  tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+    return buf;
+}
+
 void ctx_accum_push(core::Bar& accum, bool& active,
                     std::size_t& count, const core::Bar& b)
 {
@@ -89,7 +107,6 @@ void ctx_accum_push(core::Bar& accum, bool& active,
         accum.low  = std::min(accum.low,  b.low);
         accum.close = b.close;
         accum.tick_volume += b.tick_volume;
-        // спред — средний из последних (упрощённо: оставляем последний)
         accum.spread = b.spread;
         ++count;
     }
@@ -108,6 +125,10 @@ PortfolioBacktest::PortfolioBacktest(PortfolioConfig cfg) : cfg_(cfg) {
         throw std::invalid_argument("min_rr must be >= 0");
     if (cfg_.aggregate_bars == 0)
         throw std::invalid_argument("aggregate_bars must be >= 1");
+    if (cfg_.spread_mult <= 0.0)
+        throw std::invalid_argument("spread_mult must be > 0");
+    if (cfg_.commission_mult <= 0.0)
+        throw std::invalid_argument("commission_mult must be > 0");
     cfg_.validation.risk_percent       = cfg_.risk_percent;
     cfg_.validation.money.risk_percent = cfg_.risk_percent;
 }
@@ -156,7 +177,11 @@ static std::unique_ptr<Slot> load_slot(const std::string& path,
     pm_cfg.swap.contract_size       = slot->spec.contract_size;
     pm_cfg.swap.swap_long_points    = slot->spec.swap_long_points;
     pm_cfg.swap.swap_short_points   = slot->spec.swap_short_points;
-    pm_cfg.commission.commission_per_lot = slot->spec.commission_per_lot;
+
+    // --- commission_mult ---
+    pm_cfg.commission.commission_per_lot = slot->spec.commission_per_lot
+                                         * cfg.commission_mult;
+
     pm_cfg.trailing.point           = slot->spec.point;
     pm_cfg.trailing.trailing_distance_points = slot->spec.trailing_distance_points;
     pm_cfg.use_trailing             = true;
@@ -220,6 +245,9 @@ PortfolioReport PortfolioBacktest::run(const std::vector<std::string>& files) {
               << "%, min margin level: " << cfg_.min_margin_level_pct
               << "%, min RR: " << cfg_.min_rr
               << ", aggregate_bars: " << cfg_.aggregate_bars
+              << ", compound_sizing: " << (cfg_.compound_sizing ? "yes" : "no")
+              << ", spread_mult: " << cfg_.spread_mult
+              << ", commission_mult: " << cfg_.commission_mult
               << ", from_ms=" << cfg_.from_ms
               << ", to_ms="   << cfg_.to_ms
               << "\n\n";
@@ -233,11 +261,32 @@ PortfolioReport PortfolioBacktest::run(const std::vector<std::string>& files) {
     account.min_margin_level_pct = cfg_.min_margin_level_pct;
 
     validation::AccountSnapshot sizing_account = account;
-    sizing_account.balance = cfg_.initial_balance;
-    sizing_account.equity  = cfg_.initial_balance;
+    if (!cfg_.compound_sizing) {
+        sizing_account.balance = cfg_.initial_balance;
+        sizing_account.equity  = cfg_.initial_balance;
+    }
 
     std::unordered_map<uint64_t, TradeMeta> trade_meta;
     trade_meta.reserve(256);
+
+    int    cur_day          = 0;
+    double day_start_equity = account.equity;
+    double day_min_equity   = account.equity;
+    int64_t day_start_ms    = 0;
+
+    std::map<int, double> month_pnl;
+
+    auto flush_day = [&]() {
+        if (cur_day == 0) return;
+        if (day_start_equity > 0.0) {
+            const double dd = (day_start_equity - day_min_equity)
+                            / day_start_equity * 100.0;
+            if (dd > rep.max_daily_dd_pct) {
+                rep.max_daily_dd_pct = dd;
+                rep.worst_day = day_str_from_ms(day_start_ms);
+            }
+        }
+    };
 
     bool any_bar = true;
     while (any_bar) {
@@ -275,19 +324,37 @@ PortfolioReport PortfolioBacktest::run(const std::vector<std::string>& files) {
             if (dd > rep.max_drawdown_pct) rep.max_drawdown_pct = dd;
         }
 
+        if (cfg_.compound_sizing) {
+            sizing_account.balance = account.balance;
+            sizing_account.equity  = account.equity;
+        }
+
+        {
+            const int dk = day_key_from_ms(min_ts);
+            if (dk != cur_day) {
+                flush_day();
+                cur_day          = dk;
+                day_start_equity = account.equity;
+                day_min_equity   = account.equity;
+                day_start_ms     = min_ts;
+            } else {
+                if (account.equity < day_min_equity)
+                    day_min_equity = account.equity;
+            }
+        }
+
         for (std::size_t slot_idx = 0; slot_idx < slots.size(); ++slot_idx) {
             auto& s = slots[slot_idx];
             if (!s->has_bar || s->current_bar.timestamp != min_ts) continue;
             const core::Bar bar = s->current_bar;
 
-            // --- Signal history ---
             s->sig_history.push_back(bar);
             const std::size_t sig_keep = cfg_.context.max_zones_per_tf * 200;
             if (s->sig_history.size() > sig_keep)
                 s->sig_history.erase(s->sig_history.begin(),
-                                     s->sig_history.begin() + (s->sig_history.size() - sig_keep));
+                                     s->sig_history.begin() +
+                                        (s->sig_history.size() - sig_keep));
 
-            // --- Context accumulator: склеиваем aggregate_bars сигнальных в один контекстный ---
             ctx_accum_push(s->ctx_accum, s->ctx_accum_active, s->ctx_count, bar);
             if (s->ctx_count >= cfg_.aggregate_bars) {
                 s->ctx_history.push_back(s->ctx_accum);
@@ -301,7 +368,6 @@ PortfolioReport PortfolioBacktest::run(const std::vector<std::string>& files) {
             }
             ++rep.bars_processed;
 
-            // Сигналы детектируются на сигнальном ТФ, контекст берётся из контекстного.
             auto mctx = s->ctx->analyze({}, s->ctx_history);
             auto sig  = s->pat->analyze(s->sig_history, mctx);
 
@@ -340,9 +406,14 @@ PortfolioReport PortfolioBacktest::run(const std::vector<std::string>& files) {
                         ++rep.reject_rr;
                     } else {
                         ++rep.orders_approved;
-                        const int32_t spread_pts = (bar.spread > 0)
-                                                 ? bar.spread
-                                                 : s->spec.spread_typical;
+
+                        // --- spread_mult ---
+                        const int32_t base_spread = (bar.spread > 0)
+                                                  ? bar.spread
+                                                  : s->spec.spread_typical;
+                        const int32_t spread_pts =
+                            static_cast<int32_t>(base_spread * cfg_.spread_mult + 0.5);
+
                         const uint64_t pid =
                             s->pm->openPosition(vr.order, spread_pts, bar.timestamp);
                         const uint64_t key =
@@ -441,6 +512,9 @@ PortfolioReport PortfolioBacktest::run(const std::vector<std::string>& files) {
                         ++yb->losses;
                         yb->total_loss += -trade_result;
                     }
+
+                    const int mk = month_key_from_ms(e.time_ms);
+                    month_pnl[mk] += trade_result;
                 }
             }
 
@@ -451,6 +525,34 @@ PortfolioReport PortfolioBacktest::run(const std::vector<std::string>& files) {
         }
         if (rep.first_time_ms == 0) rep.first_time_ms = min_ts;
         rep.last_time_ms = min_ts;
+    }
+
+    flush_day();
+
+    if (!month_pnl.empty()) {
+        rep.total_months = month_pnl.size();
+        double sum = 0.0;
+        bool first = true;
+        for (auto& [k, pnl] : month_pnl) {
+            sum += pnl;
+            if (pnl > 0.0)      ++rep.months_positive;
+            else if (pnl < 0.0) ++rep.months_negative;
+            else                ++rep.months_flat;
+            if (first) {
+                rep.worst_month_usd = pnl;
+                rep.best_month_usd  = pnl;
+                first = false;
+            } else {
+                if (pnl < rep.worst_month_usd) rep.worst_month_usd = pnl;
+                if (pnl > rep.best_month_usd)  rep.best_month_usd  = pnl;
+            }
+        }
+        rep.avg_month_usd = sum / static_cast<double>(rep.total_months);
+        if (rep.initial_balance > 0.0) {
+            rep.worst_month_pct = rep.worst_month_usd / rep.initial_balance * 100.0;
+            rep.best_month_pct  = rep.best_month_usd  / rep.initial_balance * 100.0;
+            rep.avg_month_pct   = rep.avg_month_usd   / rep.initial_balance * 100.0;
+        }
     }
 
     rep.final_balance = account.balance;

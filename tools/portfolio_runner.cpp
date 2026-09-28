@@ -209,8 +209,26 @@ static void print_report(const engine::PortfolioReport& r) {
     std::cout << " Net PnL             : $" << r.net_pnl         << "\n";
     std::cout << " Return              : " << r.return_pct      << " %\n";
     std::cout << " Peak equity         : $" << r.peak_equity     << "\n";
-    std::cout << " Max drawdown        : " << r.max_drawdown_pct << " %\n";
+    std::cout << " Max drawdown (equity): " << r.max_drawdown_pct << " %\n";
     std::cout << "===============================================================\n";
+
+    std::cout << "\nDaily drawdown (equity):\n";
+    std::cout << " Worst day           : " << r.worst_day
+              << " (" << r.max_daily_dd_pct << " %)\n";
+
+    std::cout << "\nMonthly (by closed trades):\n";
+    std::cout << " Months total        : " << r.total_months << "\n";
+    std::cout << "   positive          : " << r.months_positive << "\n";
+    std::cout << "   negative          : " << r.months_negative << "\n";
+    std::cout << "   flat              : " << r.months_flat << "\n";
+    if (r.total_months > 0) {
+        std::cout << " Worst month         : $" << r.worst_month_usd
+                  << "  (" << r.worst_month_pct << " %)\n";
+        std::cout << " Best month          : $" << r.best_month_usd
+                  << "  (" << r.best_month_pct << " %)\n";
+        std::cout << " Avg month           : $" << r.avg_month_usd
+                  << "  (" << r.avg_month_pct << " %)\n";
+    }
 
     if (!r.per_year.empty()) {
         std::cout << "\nPer-year:\n";
@@ -296,7 +314,6 @@ int main(int argc, char** argv) {
     const std::string tf = ini.get_s("timeframe", "H1");
     const std::string tf_suffix = "_" + tf + ".bin";
 
-    // aggregate_bars: сколько сигнальных баров склеиваются в один контекстный (H1).
     std::size_t agg = 1;
     if      (tf == "M5")  agg = 12;
     else if (tf == "M15") agg = 4;
@@ -308,6 +325,9 @@ int main(int argc, char** argv) {
     cfg.risk_percent            = ini.get_d("risk_percent",     2.5);
     cfg.min_margin_level_pct    = ini.get_d("min_margin",       500.0);
     cfg.min_rr                  = ini.get_d("min_rr",           1.34);
+    cfg.spread_mult             = ini.get_d("spread_mult",      1.0);
+    cfg.commission_mult         = ini.get_d("commission_mult",  1.0);
+    cfg.compound_sizing         = ini.get_b("compound",         false);
     cfg.skip_false_breakout     = ini.get_b("skip_false_breakout",   true);
     cfg.skip_impulse_buy        = ini.get_b("skip_impulse_buy",      true);
     cfg.skip_impulse_sell       = ini.get_b("skip_impulse_sell",     true);
@@ -341,6 +361,9 @@ int main(int argc, char** argv) {
     std::cout << "Raw dir        : " << raw_dir << "\n";
     std::cout << "Timeframe      : " << tf << "\n";
     std::cout << "aggregate_bars : " << agg << "\n";
+    std::cout << "compound       : " << (cfg.compound_sizing ? "yes" : "no") << "\n";
+    std::cout << "spread_mult    : " << cfg.spread_mult << "\n";
+    std::cout << "commission_mult: " << cfg.commission_mult << "\n";
     std::cout << "Universe       : " << files.size() << " symbols\n";
     for (std::size_t i = 0; i < syms.size(); ++i) {
         std::cout << "  [" << std::setw(6) << cat_name(cats[i]) << "] "

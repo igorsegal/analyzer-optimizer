@@ -53,6 +53,7 @@ add_library(spartak_core STATIC
     src/engine/QuoteRateProvider.cpp
     src/engine/PnlCalculator.cpp
     src/engine/BacktestPlayer.cpp
+    src/engine/PortfolioBacktest.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)

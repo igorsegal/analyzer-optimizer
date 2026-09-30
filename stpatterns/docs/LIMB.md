@@ -12,7 +12,20 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ## Р¤РѕСЂРјР°С‚
 
-## LIMB-0017 - 2026-09-30 - STP
+## LIMB-0018 - 2026-09-30 - STP
+- Files:      stpatterns/src/corridor.cpp,
+              stpatterns/tools/st_emulator_main.cpp
+- Type:       LOGIC
+- Reason:     (1) find_previous_direction rewritten: check both pairs
+                  (HH and LL) independently, prefer the more recent one.
+                  Was returning 0 in 53% of cases, now should be defined
+                  most of the time.
+              (2) main.cpp scans a directory recursively (all *_H1.bin)
+                  and prints per-symbol summary plus aggregated bucket
+                  breakdown by corridor size (pct of ADR).
+- Impact:     prev-direction rule activates; multi-symbol overview.
+- Rollback:   LIMB-0017.
+- Status:     ACTIVE## LIMB-0017 - 2026-09-30 - STP
 - Files:      stpatterns/src/corridor.cpp
 - Type:       LOGIC
 - Reason:     Two fixes to match author literally:

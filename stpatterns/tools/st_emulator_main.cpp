@@ -1,5 +1,6 @@
 // =============================================================================
 //  STPatterns :: st_emulator_main.cpp
+//  Scans a directory for *_H1.bin, prints per-symbol and bucket stats.
 // =============================================================================
 #include "data/BarStream.h"
 #include "core/Types.h"
@@ -10,6 +11,9 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <algorithm>
+#include <filesystem>
+namespace fs = std::filesystem;
 struct Stats {
     int n = 0, w = 0, l = 0, be = 0;
     double sum_win = 0.0, sum_loss = 0.0, net = 0.0;
@@ -22,30 +26,28 @@ static void add_trade(Stats& s, const st::CorridorEvent& e)
     else if (e.exit_reason == "sl") { s.l++; s.sum_loss += -e.pnl_pts; }
     else if (e.exit_reason == "be") { s.be++; }
 }
-static void print_stats(const char* tag, const Stats& s)
+static double wr_of(const Stats& s)
 {
-    double wr = (s.w + s.l > 0) ? 100.0 * s.w / (s.w + s.l) : 0.0;
-    double pf = (s.sum_loss > 0.0) ? s.sum_win / s.sum_loss : 0.0;
-    double avg = (s.n > 0) ? s.net / s.n : 0.0;
-    std::printf("  %-14s  n=%5d  W=%4d  L=%5d  BE=%4d  WR=%5.1f%%  PF=%.2f  net=%8.0f  avg=%6.1f\n",
-                tag, s.n, s.w, s.l, s.be, wr, pf, s.net, avg);
+    return (s.w + s.l > 0) ? 100.0 * s.w / (s.w + s.l) : 0.0;
 }
-int main(int argc, char** argv)
+static double pf_of(const Stats& s)
 {
-    if (argc < 2) {
-        std::fprintf(stderr, "usage: st_emulator <file.bin>\n");
-        return 1;
-    }
-    const std::string path = argv[1];
+    return (s.sum_loss > 0.0) ? s.sum_win / s.sum_loss : 0.0;
+}
+static double avg_of(const Stats& s)
+{
+    return (s.n > 0) ? s.net / s.n : 0.0;
+}
+static Stats run_one(const std::string& path,
+                     std::vector<st::CorridorEvent>& out_all)
+{
+    Stats s;
     spartak::data::BarStream stream(path, 8192);
-    if (!stream.is_ok()) {
-        std::fprintf(stderr, "cannot open: %s\n", path.c_str());
-        return 1;
-    }
+    if (!stream.is_ok()) return s;
     std::vector<spartak::core::Bar> bars;
     spartak::core::Bar b;
     while (stream.next(b)) bars.push_back(b);
-    if (bars.empty()) return 1;
+    if (bars.empty()) return s;
     auto fr    = st::find_fractals(bars);
     auto daily = st::build_daily(bars);
     double point     = 0.00001;
@@ -53,57 +55,66 @@ int main(int argc, char** argv)
     double tp_mult   = 4.0;
     auto sig = st::scan_corridors(bars, fr, daily, point,
                                   threshold, true, 0.5, tp_mult);
-    std::printf("file  : %s\n", path.c_str());
-    std::printf("bars  : %zu\n", bars.size());
-    std::printf("trades: %zu\n", sig.size());
-    Stats all;
-    for (auto& e : sig) add_trade(all, e);
-    std::printf("\n=== overall ===\n");
-    print_stats("ALL", all);
-    Stats buy, sell;
     for (auto& e : sig) {
-        if (e.dir > 0) add_trade(buy, e);
-        else           add_trade(sell, e);
+        add_trade(s, e);
+        out_all.push_back(e);
     }
-    std::printf("\n=== by direction ===\n");
-    print_stats("BUY",  buy);
-    print_stats("SELL", sell);
-    std::printf("\n=== previous direction stats ===\n");
-    int pd_plus = 0, pd_minus = 0, pd_zero = 0;
-    int same = 0, diff = 0;
-    int nff_used = 0;
-    for (auto& e : sig) {
-        if (e.prev_dir_val == +1) ++pd_plus;
-        else if (e.prev_dir_val == -1) ++pd_minus;
-        else ++pd_zero;
-        if (e.prev_dir_val == e.dir) ++same;
-        else ++diff;
-        if (e.used_nff == 1) ++nff_used;
+    return s;
+}
+int main(int argc, char** argv)
+{
+    if (argc < 2) {
+        std::fprintf(stderr, "usage: st_emulator <dir_or_file>\n");
+        return 1;
     }
-    std::printf("  prev_dir +1 : %d\n", pd_plus);
-    std::printf("  prev_dir -1 : %d\n", pd_minus);
-    std::printf("  prev_dir  0 : %d\n", pd_zero);
-    std::printf("  same as trade dir : %d\n", same);
-    std::printf("  not-fully-formed stop used : %d\n", nff_used);
-    std::printf("\n=== by year ===\n");
-    std::map<int, Stats> by_year;
-    for (auto& e : sig) add_trade(by_year[e.year], e);
-    for (auto& kv : by_year) {
-        char tag[16];
-        std::snprintf(tag, sizeof(tag), "%d", kv.first);
-        print_stats(tag, kv.second);
+    const std::string arg = argv[1];
+    std::vector<std::string> files;
+    if (fs::is_directory(arg)) {
+        for (auto& e : fs::recursive_directory_iterator(arg)) {
+            if (!e.is_regular_file()) continue;
+            std::string name = e.path().filename().string();
+            if (name.size() < 7) continue;
+            if (name.substr(name.size() - 7) == "_H1.bin")
+                files.push_back(e.path().string());
+        }
+        std::sort(files.begin(), files.end());
+    } else {
+        files.push_back(arg);
     }
+    std::printf("files: %zu\n\n", files.size());
+    std::vector<st::CorridorEvent> all;
+    std::printf("%-12s %6s %6s %6s %6s %6s %8s %8s\n",
+                "symbol", "n", "W", "L", "BE", "WR%", "PF", "avg");
+    Stats total;
+    for (auto& f : files) {
+        std::string sym = fs::path(f).parent_path().filename().string();
+        Stats s = run_one(f, all);
+        for (auto& e : all) { (void)e; }
+        total.n += s.n; total.w += s.w; total.l += s.l; total.be += s.be;
+        total.sum_win += s.sum_win; total.sum_loss += s.sum_loss; total.net += s.net;
+        std::printf("%-12s %6d %6d %6d %6d %6.1f %8.2f %8.1f\n",
+                    sym.c_str(), s.n, s.w, s.l, s.be,
+                    wr_of(s), pf_of(s), avg_of(s));
+    }
+    std::printf("\n%-12s %6d %6d %6d %6d %6.1f %8.2f %8.1f\n",
+                "TOTAL", total.n, total.w, total.l, total.be,
+                wr_of(total), pf_of(total), avg_of(total));
+    // Bucket breakdown over all events.
     Stats b1, b2, b3, b4;
-    for (auto& e : sig) {
+    for (auto& e : all) {
         if (e.adr_pct < 20)      add_trade(b1, e);
         else if (e.adr_pct < 30) add_trade(b2, e);
         else if (e.adr_pct < 40) add_trade(b3, e);
         else                     add_trade(b4, e);
     }
-    std::printf("\n=== by corridor size (pct of ADR) ===\n");
-    print_stats("0-20",   b1);
-    print_stats("20-30",  b2);
-    print_stats("30-40",  b3);
-    print_stats("40-50",  b4);
+    std::printf("\n=== bucket by corridor size (pct of ADR) ===\n");
+    std::printf("  %-8s n=%5d W=%4d L=%5d BE=%4d WR=%5.1f%% PF=%.2f avg=%6.1f\n",
+                "0-20",   b1.n, b1.w, b1.l, b1.be, wr_of(b1), pf_of(b1), avg_of(b1));
+    std::printf("  %-8s n=%5d W=%4d L=%5d BE=%4d WR=%5.1f%% PF=%.2f avg=%6.1f\n",
+                "20-30",  b2.n, b2.w, b2.l, b2.be, wr_of(b2), pf_of(b2), avg_of(b2));
+    std::printf("  %-8s n=%5d W=%4d L=%5d BE=%4d WR=%5.1f%% PF=%.2f avg=%6.1f\n",
+                "30-40",  b3.n, b3.w, b3.l, b3.be, wr_of(b3), pf_of(b3), avg_of(b3));
+    std::printf("  %-8s n=%5d W=%4d L=%5d BE=%4d WR=%5.1f%% PF=%.2f avg=%6.1f\n",
+                "40-50",  b4.n, b4.w, b4.l, b4.be, wr_of(b4), pf_of(b4), avg_of(b4));
     return 0;
 }

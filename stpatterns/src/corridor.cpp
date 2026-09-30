@@ -20,7 +20,7 @@ static void utc_components(int64_t ms, int& year, int& mon, int& mday,
     mon  = tm.tm_mon + 1;
     mday = tm.tm_mday;
     hour = tm.tm_hour;
-    wday = tm.tm_wday;   // 0 = Sunday
+    wday = tm.tm_wday;
 }
 static int day_key_from_ms(int64_t ms)
 {
@@ -34,14 +34,13 @@ static int year_from_ms(int64_t ms)
     utc_components(ms, y, m, d, h, w);
     return y;
 }
-// Author page 80: trade 06:00-19:00 GMT, skip Fri after 20, Mon before 02.
 static bool in_session(int64_t ms)
 {
     int y, m, d, h, w;
     utc_components(ms, y, m, d, h, w);
     if (h < 6 || h >= 19) return false;
-    if (w == 5 && h >= 20) return false;   // Friday evening
-    if (w == 1 && h < 2)   return false;   // Monday early
+    if (w == 5 && h >= 20) return false;
+    if (w == 1 && h < 2)   return false;
     return true;
 }
 static int find_day_idx(const std::vector<DailyBar>& daily, int day_key)
@@ -66,34 +65,37 @@ static int find_stop_fractal(const std::vector<Fractal>& fractals,
     }
     return -1;
 }
+// Prev direction: check both pairs (HH and LL), prefer the more recent.
 static int find_previous_direction(const std::vector<Fractal>& fractals,
                                    int curr_idx)
 {
-    int last_idx = -1;
+    int    up1 = -1, up2 = -1;
+    int    dn1 = -1, dn2 = -1;
     for (int k = curr_idx - 1; k >= 0; --k) {
-        if (fractals[k].fully_formed) { last_idx = k; break; }
-    }
-    if (last_idx < 0) return 0;
-    int last_type = fractals[last_idx].type;
-    if (last_type > 0) {
-        for (int k = last_idx - 1; k >= 0; --k) {
-            if (!fractals[k].fully_formed) continue;
-            if (fractals[k].type > 0) {
-                if (fractals[last_idx].price > fractals[k].price) return +1;
-                return 0;
-            }
+        if (!fractals[k].fully_formed) continue;
+        if (fractals[k].type > 0) {
+            if (up1 < 0) up1 = k;
+            else if (up2 < 0) { up2 = k; break; }
+        } else {
+            if (dn1 < 0) dn1 = k;
+            else if (dn2 < 0) { dn2 = k; break; }
         }
-        return 0;
-    } else {
-        for (int k = last_idx - 1; k >= 0; --k) {
-            if (!fractals[k].fully_formed) continue;
-            if (fractals[k].type < 0) {
-                if (fractals[last_idx].price < fractals[k].price) return -1;
-                return 0;
-            }
-        }
-        return 0;
     }
+    bool hh = false, ll = false;
+    int  up_idx = -1, dn_idx = -1;
+    if (up1 >= 0 && up2 >= 0 && fractals[up1].price > fractals[up2].price) {
+        hh = true; up_idx = up1;
+    }
+    if (dn1 >= 0 && dn2 >= 0 && fractals[dn1].price < fractals[dn2].price) {
+        ll = true; dn_idx = dn1;
+    }
+    if (hh && !ll) return +1;
+    if (ll && !hh) return -1;
+    if (hh && ll) {
+        // Prefer the more recent fractal.
+        return (up_idx > dn_idx) ? +1 : -1;
+    }
+    return 0;
 }
 static bool find_not_fully_formed_stop(
     const std::vector<spartak::core::Bar>& bars,
@@ -130,7 +132,6 @@ static void simulate_exit(
     exit_idx = -1;
     exit_price = entry_price;
     reason = "eod";
-    // Author: TP and BE trigger relative to start_line (broken fractal).
     double tp = (dir > 0)
               ? start_line + height * tp_mult
               : start_line - height * tp_mult;

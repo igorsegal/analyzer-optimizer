@@ -12,7 +12,15 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ## Р¤РѕСЂРјР°С‚
 
-## LIMB-0021 - 2026-09-30 - STP
+## LIMB-0022 - 2026-09-30 - STP
+- Files:      stpatterns/tools/st_emulator_main.cpp
+- Type:       DIAG
+- Reason:     Add per-year breakdown and split universe into
+              JPY-pairs + Gold group (best performers) vs rest.
+              Purpose: check whether the edge is stable over time.
+- Impact:     None on logic.
+- Rollback:   LIMB-0021.
+- Status:     ACTIVE## LIMB-0021 - 2026-09-30 - STP
 - Files:      stpatterns/tools/st_emulator_main.cpp
 - Type:       LOGIC
 - Reason:     Restrict universe to FX majors, crosses, and metals.

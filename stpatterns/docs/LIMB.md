@@ -33,6 +33,17 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 - Impact:     TP hits preserved. WR should stay ~25-30%.
 - Rollback:   Move BE check back before TP.
 - Status:     ACTIVE
+## LIMB-0010 - 2026-09-30 - STP
+- Files:      stpatterns/src/corridor.cpp
+- Type:       LOGIC
+- Reason:     Bug in simulate_exit: BE trigger was checked before TP.
+              If a bar's range covered both +210% (BE trigger) and
+              +400% (TP), we exited at BE instead of TP. Result:
+              wins dropped from 391 to 319, PF from 0.955 to 0.812.
+              Fix: check TP first, then SL/BE.
+- Impact:     TP hits preserved. WR should stay ~25-30%.
+- Rollback:   Move BE check back before TP.
+- Status:     ACTIVE
 ## LIMB-0009 - 2026-09-30 - STP
 - Files:      stpatterns/src/corridor.cpp
 - Type:       LOGIC

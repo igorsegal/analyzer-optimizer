@@ -1,4 +1,4 @@
-﻿// =============================================================================
+// =============================================================================
 //  SPARTAK :: engine/BacktestPlayer.h
 //  Главный цикл бэктеста.
 //
@@ -41,7 +41,12 @@ struct BacktestConfig {
     std::size_t aggregate_bars      = 1;     // 1=M5, 3=M15, 6=M30, 12=H1, 288=D1
     std::size_t rolling_window      = 100;   // bars (уже агрегированные)
     std::size_t rolling_window_h1   = 50;    // H1-bars (агрегируются из M5)
+    std::size_t aggregate_bars_h1   = 12;    // H1-контекст (из M5)
+    std::size_t aggregate_bars_d1   = 288;   // D1-тренд (из M5)
+    std::size_t rolling_window_d1   = 30;    // D1-bars для тренда
     bool        use_multi_tf        = true;  // H1-контекст + M5-сигналы
+    std::string file_h1;                     // путь к *_H1.bin (пусто = авто из --file)
+    std::string file_d1;                     // путь к *_D1.bin (пусто = авто из --file)
     // Пропускать ли нерегулярный префикс данных
     bool skip_irregular_prefix = true;
     int64_t max_gap_ms         = 14'400'000LL;   // 4 часа

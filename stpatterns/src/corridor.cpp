@@ -5,6 +5,7 @@
 #include <cmath>
 #include <ctime>
 #include <algorithm>
+#include <climits>
 namespace st {
 static void utc_components(int64_t ms, int& year, int& mon, int& mday,
                            int& hour, int& wday)
@@ -50,8 +51,7 @@ static int find_day_idx(const std::vector<DailyBar>& daily, int day_key)
     return -1;
 }
 static int find_stop_fractal(const std::vector<Fractal>& fractals,
-                             int curr_idx,
-                             int dir)
+                             int curr_idx, int dir)
 {
     const Fractal& curr = fractals[curr_idx];
     for (int k = curr_idx - 1; k >= 0; --k) {
@@ -95,9 +95,7 @@ static int find_previous_direction(const std::vector<Fractal>& fractals,
 }
 static bool find_not_fully_formed_stop(
     const std::vector<spartak::core::Bar>& bars,
-    int break_idx,
-    int dir,
-    double& price)
+    int break_idx, int dir, double& price)
 {
     if (break_idx < 2) return false;
     const auto& L = bars[break_idx - 2];
@@ -109,8 +107,16 @@ static bool find_not_fully_formed_stop(
     }
     return false;
 }
+// Simulate exit with Reverse Movement pattern.
+// all_signals is the full sorted+deduped signal list.
+// current_idx is index of the current trade in all_signals.
+// Find first signal with opposite dir at index > current_idx
+// with entry_idx before SL/TP. If exists and triggers before SL/TP
+// -> exit at that signal's entry_price, reason = "reverse".
 static void simulate_exit(
     const std::vector<spartak::core::Bar>& bars,
+    const std::vector<CorridorEvent>&      all_signals,
+    int    current_idx,
     int    dir,
     int    entry_idx,
     double entry_price,
@@ -128,6 +134,18 @@ static void simulate_exit(
     exit_idx = -1;
     exit_price = entry_price;
     reason = "eod";
+    // Find first opposite signal after current_idx
+    int reverse_bar = INT_MAX;
+    double reverse_entry_px = 0.0;
+    for (int k = current_idx + 1; k < (int)all_signals.size(); ++k) {
+        if (all_signals[k].dir != dir) {
+            reverse_bar = all_signals[k].entry_idx;
+            reverse_entry_px = all_signals[k].entry_price;
+            break;
+        }
+        // If we hit the same direction signal that's closer than any
+        // opposite one, keep looking - not a reversal.
+    }
     double tp = (dir > 0)
               ? start_line + height * tp_mult
               : start_line - height * tp_mult;
@@ -137,32 +155,47 @@ static void simulate_exit(
     double sl = sl_initial;
     bool   be_moved = false;
     for (int i = entry_idx + 1; i < N; ++i) {
+        // 1. TP first (favorable)
         if (dir > 0) {
             if (bars[i].high >= tp) {
                 exit_idx = i; exit_price = tp; reason = "tp"; return;
-            }
-            if (!be_moved && bars[i].high >= be_trigger) {
-                sl = entry_price;
-                be_moved = true;
-            }
-            if (bars[i].low <= sl) {
-                exit_idx = i; exit_price = sl;
-                reason = be_moved ? "be" : "sl";
-                return;
             }
         } else {
             if (bars[i].low <= tp) {
                 exit_idx = i; exit_price = tp; reason = "tp"; return;
             }
+        }
+        // 2. BE update
+        if (dir > 0) {
+            if (!be_moved && bars[i].high >= be_trigger) {
+                sl = entry_price;
+                be_moved = true;
+            }
+        } else {
             if (!be_moved && bars[i].low <= be_trigger) {
                 sl = entry_price;
                 be_moved = true;
             }
-            if (bars[i].high >= sl) {
-                exit_idx = i; exit_price = sl;
-                reason = be_moved ? "be" : "sl";
-                return;
-            }
+        }
+        // 3. SL/BE hit on this bar
+        bool sl_hit = (dir > 0) ? (bars[i].low <= sl)
+                                : (bars[i].high >= sl);
+        if (sl_hit) {
+            // If opposite signal triggered strictly BEFORE this bar
+            // (i > reverse_bar) we would have exited earlier; but
+            // if i == reverse_bar and both SL and reverse occur
+            // on same bar, prefer SL (conservative).
+            exit_idx = i;
+            exit_price = sl;
+            reason = be_moved ? "be" : "sl";
+            return;
+        }
+        // 4. Reverse (opposite signal at this bar, no SL/TP hit yet)
+        if (i == reverse_bar) {
+            exit_idx = i;
+            exit_price = reverse_entry_px;
+            reason = "reverse";
+            return;
         }
     }
 }
@@ -179,7 +212,6 @@ std::vector<CorridorEvent> scan_corridors(
     if (fractals.size() < 2) return raw;
     if (point <= 0.0) return raw;
     const int N = (int)bars.size();
-    // Threshold as fraction of ADR(5).
     const double threshold_frac = 0.12;
     const double min_rr = 1.5;
     for (size_t k = 1; k < fractals.size(); ++k) {
@@ -292,10 +324,12 @@ std::vector<CorridorEvent> scan_corridors(
     }
     std::vector<CorridorEvent> out;
     int last_exit_bar = -1;
-    for (auto e : unique_raw) {
+    for (size_t si = 0; si < unique_raw.size(); ++si) {
+        auto e = unique_raw[si];
         if (e.entry_idx <= last_exit_bar) continue;
         int exit_idx; double exit_price; std::string reason;
-        simulate_exit(bars, e.dir, e.entry_idx, e.entry_price,
+        simulate_exit(bars, unique_raw, (int)si,
+                      e.dir, e.entry_idx, e.entry_price,
                       e.start_line, e.stop_line, e.height,
                       tp_mult, 2.1, point,
                       exit_idx, exit_price, reason);
@@ -305,7 +339,10 @@ std::vector<CorridorEvent> scan_corridors(
         double dir_sign = (e.dir > 0) ? 1.0 : -1.0;
         e.pnl_pts = (exit_price - e.entry_price) * dir_sign / point;
         out.push_back(e);
-        last_exit_bar = (exit_idx >= 0) ? exit_idx : N;
+        if (reason == "reverse" && exit_idx >= 0)
+            last_exit_bar = exit_idx - 1;   // include the reversing signal
+        else
+            last_exit_bar = (exit_idx >= 0) ? exit_idx : N;
     }
     return out;
 }

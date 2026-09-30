@@ -1,6 +1,5 @@
 // =============================================================================
 //  STPatterns :: st_emulator_main.cpp
-//  Per-year + JPY/Gold split.
 // =============================================================================
 #include "data/BarStream.h"
 #include "core/Types.h"
@@ -33,30 +32,48 @@ static bool is_jpy_or_gold(const std::string& s)
     return false;
 }
 struct Stats {
-    int n = 0, w = 0, l = 0, be = 0;
-    double sum_win = 0.0, sum_loss = 0.0, net = 0.0;
+    int n = 0, w = 0, l = 0, be = 0, rev = 0;
+    double sum_win = 0.0, sum_loss = 0.0, sum_rev_loss = 0.0, net = 0.0;
 };
 static void add_trade(Stats& s, const st::CorridorEvent& e)
 {
     s.n++;
     s.net += e.pnl_pts;
-    if (e.exit_reason == "tp")      { s.w++; s.sum_win += e.pnl_pts; }
-    else if (e.exit_reason == "sl") { s.l++; s.sum_loss += -e.pnl_pts; }
-    else if (e.exit_reason == "be") { s.be++; }
+    if (e.exit_reason == "tp") {
+        s.w++;
+        s.sum_win += e.pnl_pts;
+    } else if (e.exit_reason == "sl") {
+        s.l++;
+        s.sum_loss += -e.pnl_pts;
+    } else if (e.exit_reason == "be") {
+        s.be++;
+    } else if (e.exit_reason == "reverse") {
+        s.rev++;
+        if (e.pnl_pts < 0.0) s.sum_rev_loss += -e.pnl_pts;
+        else                 s.sum_win += e.pnl_pts;
+    }
 }
 static double wr_of(const Stats& s)
-{ return (s.w + s.l > 0) ? 100.0 * s.w / (s.w + s.l) : 0.0; }
+{
+    int tot = s.w + s.l;
+    return (tot > 0) ? 100.0 * s.w / tot : 0.0;
+}
 static double pf_of(const Stats& s)
-{ return (s.sum_loss > 0.0) ? s.sum_win / s.sum_loss : 0.0; }
+{
+    double loss = s.sum_loss + s.sum_rev_loss;
+    return (loss > 0.0) ? s.sum_win / loss : 0.0;
+}
 static double avg_pts(const Stats& s)
-{ return (s.n > 0) ? s.net / s.n : 0.0; }
+{
+    return (s.n > 0) ? s.net / s.n : 0.0;
+}
 static void print_stats(const char* tag, const Stats& s)
 {
-    std::printf("  %-14s  n=%6d  W=%5d  L=%6d  BE=%5d  WR=%5.1f%%  PF=%.2f  avg=%7.1f\n",
-                tag, s.n, s.w, s.l, s.be, wr_of(s), pf_of(s), avg_pts(s));
+    std::printf("  %-14s n=%6d W=%5d L=%6d BE=%5d R=%5d WR=%5.1f%% PF=%.2f avg=%7.1f\n",
+                tag, s.n, s.w, s.l, s.be, s.rev,
+                wr_of(s), pf_of(s), avg_pts(s));
 }
 static void run_one(const std::string& path,
-                    const std::string& sym,
                     std::vector<st::CorridorEvent>& out_all)
 {
     spartak::data::BarStream stream(path, 8192);
@@ -71,15 +88,14 @@ static void run_one(const std::string& path,
     if (bars.empty()) return;
     auto fr    = st::find_fractals(bars);
     auto daily = st::build_daily(bars);
-    auto sig = st::scan_corridors(bars, fr, daily, point, true, 0.5, 4.0);
+    auto sig   = st::scan_corridors(bars, fr, daily, point, true, 0.5, 4.0);
     for (auto& e : sig) out_all.push_back(e);
-    (void)sym;
 }
 int main(int argc, char** argv)
 {
     if (argc < 2) { std::fprintf(stderr, "usage: st_emulator <dir>\n"); return 1; }
     const std::string arg = argv[1];
-    std::vector<std::pair<std::string,std::string>> files;  // (sym, path)
+    std::vector<std::pair<std::string,std::string>> files;
     for (auto& e : fs::recursive_directory_iterator(arg)) {
         if (!e.is_regular_file()) continue;
         std::string name = e.path().filename().string();
@@ -91,35 +107,27 @@ int main(int argc, char** argv)
     }
     std::sort(files.begin(), files.end());
     std::printf("files: %zu\n", files.size());
-    std::vector<st::CorridorEvent> all;
-    for (auto& [sym, path] : files) run_one(path, sym, all);
-    std::printf("total trades: %zu\n\n", all.size());
-    // --- By symbol group ---
-    Stats g1, g2;
-    for (auto& e : all) {
-        // can't know symbol from event; we print aggregated instead
-        (void)e;
-    }
-    // Since CorridorEvent has no symbol, aggregate using per-symbol runs:
-    // re-run each symbol and add to right group.
-    Stats jpy_gold, other;
+    std::map<std::string, std::vector<st::CorridorEvent>> by_sym;
+    size_t total_trades = 0;
     for (auto& [sym, path] : files) {
-        std::vector<st::CorridorEvent> evs;
-        run_one(path, sym, evs);
+        run_one(path, by_sym[sym]);
+        total_trades += by_sym[sym].size();
+    }
+    std::printf("total trades: %zu\n\n", total_trades);
+    Stats jpy_gold, other;
+    for (auto& [sym, evs] : by_sym) {
+        bool is_jg = is_jpy_or_gold(sym);
         for (auto& e : evs) {
-            if (is_jpy_or_gold(sym)) add_trade(jpy_gold, e);
-            else                     add_trade(other, e);
+            if (is_jg) add_trade(jpy_gold, e);
+            else       add_trade(other,   e);
         }
     }
     std::printf("=== by group ===\n");
     print_stats("JPY + GOLD", jpy_gold);
     print_stats("other FX",   other);
-    // --- Per-year for JPY+Gold ---
     std::map<int, Stats> by_year_jg;
     std::map<int, Stats> by_year_ot;
-    for (auto& [sym, path] : files) {
-        std::vector<st::CorridorEvent> evs;
-        run_one(path, sym, evs);
+    for (auto& [sym, evs] : by_sym) {
         bool is_jg = is_jpy_or_gold(sym);
         for (auto& e : evs) {
             if (is_jg) add_trade(by_year_jg[e.year], e);

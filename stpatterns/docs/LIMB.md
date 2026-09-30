@@ -12,7 +12,19 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ## Р¤РѕСЂРјР°С‚
 
-## LIMB-0022 - 2026-09-30 - STP
+## LIMB-0023 - 2026-09-30 - STP
+- Files:      stpatterns/src/corridor.cpp
+- Type:       PATTERN
+- Reason:     Implement pattern #4 "Reverse Movement" (book p.52).
+              When a trade is open and an OPPOSITE signal triggers
+              before our SL/TP is hit, close the current trade at
+              the opposite signal's entry price (exit_reason="reverse")
+              and let the opposite signal become the next trade.
+              This replaces a full SL loss with a smaller loss at
+              the moment of reversal.
+- Impact:     Lower avg loss, higher PF.
+- Rollback:   LIMB-0022.
+- Status:     ACTIVE## LIMB-0022 - 2026-09-30 - STP
 - Files:      stpatterns/tools/st_emulator_main.cpp
 - Type:       DIAG
 - Reason:     Add per-year breakdown and split universe into

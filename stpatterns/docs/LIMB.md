@@ -22,7 +22,17 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ---
 
-## LIMB-0008 - 2026-09-30 - STP
+## LIMB-0009 - 2026-09-30 - STP
+- Files:      stpatterns/src/corridor.cpp
+- Type:       LOGIC
+- Reason:     Add BE-at-210 rule (author, page 45):
+              when price moves 2.1 * height into profit,
+              move SL to entry price (breakeven).
+              Without this rule trades that move +210% and reverse
+              become full losses. This is why WR was only 25%.
+- Impact:     Expected WR up to 35-50%, PF > 1.0
+- Rollback:   Remove BE logic from simulate_exit
+- Status:     ACTIVE## LIMB-0008 - 2026-09-30 - STP
 - Р¤Р°Р№Р»С‹:      stpatterns/src/corridor.cpp
 - РўРёРї:        LOGIC
 - РџСЂРёС‡РёРЅР°:    Р‘Р°Рі stop_line: РёСЃРїРѕР»СЊР·РѕРІР°Р»СЃСЏ prev (РїСЂРµРґС‹РґСѓС‰РёР№ РІ СЃРїРёСЃРєРµ),

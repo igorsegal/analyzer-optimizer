@@ -27,9 +27,30 @@ static int find_day_idx(const std::vector<DailyBar>& daily, int day_key)
     return -1;
 }
 
-// Simulate: from entry_idx + 1 forward, find first SL or TP hit.
-// Returns exit bar index. Sets exit_price, reason.
-// If no exit before end of bars - exit_idx = -1, reason = "eod".
+// Find nearest previous OPPOSITE fractal satisfying side condition.
+// For BUY (curr is UP): look for DOWN fractal with low < curr.high.
+// For SELL (curr is DOWN): look for UP fractal with high > curr.low.
+// Returns index in fractals[], or -1 if not found.
+static int find_stop_fractal(const std::vector<Fractal>& fractals,
+                             int curr_idx,
+                             int dir)
+{
+    const Fractal& curr = fractals[curr_idx];
+    for (int k = curr_idx - 1; k >= 0; --k) {
+        const Fractal& f = fractals[k];
+        if (!f.fully_formed) continue;
+
+        if (dir > 0) {
+            // BUY: need DOWN fractal below entry
+            if (f.type == -1 && f.price < curr.price) return k;
+        } else {
+            // SELL: need UP fractal above entry
+            if (f.type == +1 && f.price > curr.price) return k;
+        }
+    }
+    return -1;
+}
+
 static void simulate_exit(
     const std::vector<spartak::core::Bar>& bars,
     int    dir,
@@ -49,32 +70,18 @@ static void simulate_exit(
 
     for (int i = entry_idx + 1; i < N; ++i) {
         if (dir > 0) {
-            // BUY: SL below entry (stop_line), TP above (entry + tp_mult*H)
             if (bars[i].low <= sl) {
-                exit_idx = i;
-                exit_price = sl;
-                reason = "sl";
-                return;
+                exit_idx = i; exit_price = sl; reason = "sl"; return;
             }
             if (bars[i].high >= tp) {
-                exit_idx = i;
-                exit_price = tp;
-                reason = "tp";
-                return;
+                exit_idx = i; exit_price = tp; reason = "tp"; return;
             }
         } else {
-            // SELL: SL above entry, TP below
             if (bars[i].high >= sl) {
-                exit_idx = i;
-                exit_price = sl;
-                reason = "sl";
-                return;
+                exit_idx = i; exit_price = sl; reason = "sl"; return;
             }
             if (bars[i].low <= tp) {
-                exit_idx = i;
-                exit_price = tp;
-                reason = "tp";
-                return;
+                exit_idx = i; exit_price = tp; reason = "tp"; return;
             }
         }
     }
@@ -94,17 +101,21 @@ std::vector<CorridorEvent> scan_corridors(
     if (fractals.size() < 2) return raw;
     const int N = (int)bars.size();
 
-    // --- Pass 1: generate all raw signals ---
     for (size_t k = 1; k < fractals.size(); ++k) {
-        const Fractal& prev = fractals[k - 1];
         const Fractal& curr = fractals[k];
-
-        if (prev.type == curr.type) continue;
-        if (!prev.fully_formed || !curr.fully_formed) continue;
+        if (!curr.fully_formed) continue;
 
         int dir = (curr.type > 0) ? +1 : -1;
+
+        int stop_k = find_stop_fractal(fractals, (int)k, dir);
+        if (stop_k < 0) continue;
+
         double start_line = curr.price;
-        double stop_line  = prev.price;
+        double stop_line  = fractals[stop_k].price;
+
+        // Sanity: stop must be on correct side
+        if (dir > 0 && stop_line >= start_line) continue;
+        if (dir < 0 && stop_line <= start_line) continue;
 
         double height = std::fabs(start_line - stop_line);
         if (height <= 0.0) continue;
@@ -116,8 +127,7 @@ std::vector<CorridorEvent> scan_corridors(
             if (di < 5) continue;
             double adr5 = adr5_at(daily, di);
             if (adr5 <= 0.0) continue;
-            double adr5_pts = adr5 / point;
-            double max_h = adr_mult * adr5_pts;
+            double max_h = adr_mult * (adr5 / point);
             if ((double)height_pts > max_h) continue;
         }
 
@@ -154,7 +164,6 @@ std::vector<CorridorEvent> scan_corridors(
         }
     }
 
-    // --- Sort by entry_idx, dedup per bar ---
     std::sort(raw.begin(), raw.end(),
               [](const CorridorEvent& a, const CorridorEvent& b) {
                   return a.entry_idx < b.entry_idx;
@@ -168,7 +177,6 @@ std::vector<CorridorEvent> scan_corridors(
         last_idx = e.entry_idx;
     }
 
-    // --- Pass 2: non-overlap filter + simulate exit ---
     std::vector<CorridorEvent> out;
     int last_exit_bar = -1;
 

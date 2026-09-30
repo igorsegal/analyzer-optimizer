@@ -12,7 +12,20 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ## Р¤РѕСЂРјР°С‚
 
-## LIMB-NNNN - YYYY-MM-DD - STP
+## LIMB-0012 - 2026-09-30 - STP
+- Files:      stpatterns/src/corridor.cpp
+- Type:       LOGIC
+- Reason:     Implement author rules (book pages 38-43):
+              (1) previous_direction: compare last two up / last two down
+                  fractals before the corridor.
+              (2) reversal_zone: last closed bar before break.
+              (3) stop selection: if trade direction matches
+                  previous_direction -> try not-fully-formed opposite
+                  fractal at bar[break-1]; else use last fully-formed
+                  opposite fractal.
+- Impact:     Stop may be closer in trend-following setups.
+- Rollback:   Use only fully-formed stop (LIMB-0008 logic).
+- Status:     ACTIVE## LIMB-NNNN - YYYY-MM-DD - STP
 - Р¤Р°Р№Р»С‹:      СЃРїРёСЃРѕРє
 - РўРёРї:        CONTRACT | MODULE | LOGIC | CONFIG
 - РџСЂРёС‡РёРЅР°:    С‚РµРєСЃС‚

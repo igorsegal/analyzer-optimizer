@@ -4,6 +4,7 @@
 #include "st/corridor.h"
 #include <cmath>
 #include <ctime>
+#include <algorithm>
 
 namespace st {
 
@@ -105,7 +106,23 @@ std::vector<CorridorEvent> scan_corridors(
             }
         }
     }
-    return out;
+
+    // Sort by entry bar index.
+    std::sort(out.begin(), out.end(),
+              [](const CorridorEvent& a, const CorridorEvent& b) {
+                  return a.entry_idx < b.entry_idx;
+              });
+
+    // Dedup: one signal per bar, keep first occurrence.
+    std::vector<CorridorEvent> unique_out;
+    unique_out.reserve(out.size());
+    int last_idx = -1;
+    for (const auto& e : out) {
+        if (e.entry_idx == last_idx) continue;
+        unique_out.push_back(e);
+        last_idx = e.entry_idx;
+    }
+    return unique_out;
 }
 
 } // namespace st

@@ -57,9 +57,6 @@ add_library(spartak_core STATIC
     src/engine/PnlCalculator.cpp
     src/engine/BacktestPlayer.cpp
     src/engine/PortfolioBacktest.cpp
-    stpatterns/src/fractal.cpp
-    stpatterns/src/adr.cpp
-    stpatterns/src/corridor.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)
@@ -67,7 +64,7 @@ target_compile_features(spartak_core PUBLIC cxx_std_20)
 # -----------------------------------------------------------------------------
 #  Main executable
 # -----------------------------------------------------------------------------
-add_executable(spartak main.cpp)
+add_executable(spartak cpp/main.cpp)
 target_link_libraries(spartak PRIVATE spartak_core)
 
 # -----------------------------------------------------------------------------
@@ -81,39 +78,39 @@ target_link_libraries(portfolio_runner PRIVATE spartak_core)
 # -----------------------------------------------------------------------------
 #  Smoke tests
 # -----------------------------------------------------------------------------
-add_executable(smoke_data         smoke_data.cpp)
-add_executable(smoke_file         smoke_file.cpp)
-add_executable(smoke_sanitize     smoke_sanitize.cpp)
-add_executable(smoke_fractal      smoke_fractal.cpp)
-add_executable(smoke_extractors   smoke_extractors.cpp)
-add_executable(smoke_structure    smoke_structure.cpp)
-add_executable(smoke_shadow       smoke_shadow.cpp)
-add_executable(smoke_zones        smoke_zones.cpp)
-add_executable(smoke_cleaner      smoke_cleaner.cpp)
-add_executable(smoke_bias         smoke_bias.cpp)
-add_executable(smoke_context      smoke_context.cpp)
-add_executable(smoke_candle       smoke_candle.cpp)
-add_executable(smoke_volume       smoke_volume.cpp)
-add_executable(smoke_confirmation smoke_confirmation.cpp)
-add_executable(smoke_pinbar       smoke_pinbar.cpp)
-add_executable(smoke_inside       smoke_inside.cpp)
-add_executable(smoke_engulfing    smoke_engulfing.cpp)
-add_executable(smoke_impulse      smoke_impulse.cpp)
-add_executable(smoke_pattern      smoke_pattern.cpp)
-add_executable(smoke_spread       smoke_spread.cpp)
-add_executable(smoke_counter      smoke_counter.cpp)
-add_executable(smoke_money        smoke_money.cpp)
-add_executable(smoke_lot          smoke_lot.cpp)
-add_executable(smoke_margin       smoke_margin.cpp)
-add_executable(smoke_session      smoke_session.cpp)
-add_executable(smoke_slippage     smoke_slippage.cpp)
-add_executable(smoke_validator    smoke_validator.cpp)
-add_executable(smoke_trigger      smoke_trigger.cpp)
-add_executable(smoke_breakeven    smoke_breakeven.cpp)
-add_executable(smoke_swap         smoke_swap.cpp)
-add_executable(smoke_commission   smoke_commission.cpp)
-add_executable(smoke_trailing     smoke_trailing.cpp)
-add_executable(smoke_emergency    smoke_emergency.cpp)
+add_executable(smoke_data         cpp/smoke_data.cpp)
+add_executable(smoke_file         cpp/smoke_file.cpp)
+add_executable(smoke_sanitize     cpp/smoke_sanitize.cpp)
+add_executable(smoke_fractal      cpp/smoke_fractal.cpp)
+add_executable(smoke_extractors   cpp/smoke_extractors.cpp)
+add_executable(smoke_structure    cpp/smoke_structure.cpp)
+add_executable(smoke_shadow       cpp/smoke_shadow.cpp)
+add_executable(smoke_zones        cpp/smoke_zones.cpp)
+add_executable(smoke_cleaner      cpp/smoke_cleaner.cpp)
+add_executable(smoke_bias         cpp/smoke_bias.cpp)
+add_executable(smoke_context      cpp/smoke_context.cpp)
+add_executable(smoke_candle       cpp/smoke_candle.cpp)
+add_executable(smoke_volume       cpp/smoke_volume.cpp)
+add_executable(smoke_confirmation cpp/smoke_confirmation.cpp)
+add_executable(smoke_pinbar       cpp/smoke_pinbar.cpp)
+add_executable(smoke_inside       cpp/smoke_inside.cpp)
+add_executable(smoke_engulfing    cpp/smoke_engulfing.cpp)
+add_executable(smoke_impulse      cpp/smoke_impulse.cpp)
+add_executable(smoke_pattern      cpp/smoke_pattern.cpp)
+add_executable(smoke_spread       cpp/smoke_spread.cpp)
+add_executable(smoke_counter      cpp/smoke_counter.cpp)
+add_executable(smoke_money        cpp/smoke_money.cpp)
+add_executable(smoke_lot          cpp/smoke_lot.cpp)
+add_executable(smoke_margin       cpp/smoke_margin.cpp)
+add_executable(smoke_session      cpp/smoke_session.cpp)
+add_executable(smoke_slippage     cpp/smoke_slippage.cpp)
+add_executable(smoke_validator    cpp/smoke_validator.cpp)
+add_executable(smoke_trigger      cpp/smoke_trigger.cpp)
+add_executable(smoke_breakeven    cpp/smoke_breakeven.cpp)
+add_executable(smoke_swap         cpp/smoke_swap.cpp)
+add_executable(smoke_commission   cpp/smoke_commission.cpp)
+add_executable(smoke_trailing     cpp/smoke_trailing.cpp)
+add_executable(smoke_emergency    cpp/smoke_emergency.cpp)
 
 target_link_libraries(smoke_data         PRIVATE spartak_core)
 target_link_libraries(smoke_file         PRIVATE spartak_core)
@@ -150,11 +147,3 @@ target_link_libraries(smoke_trailing     PRIVATE spartak_core)
 target_link_libraries(smoke_emergency    PRIVATE spartak_core)
 
 enable_testing()
-target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/stpatterns/include)
-# -----------------------------------------------------------------------------
-#  STPatterns emulator
-# -----------------------------------------------------------------------------
-add_executable(st_emulator
-    stpatterns/tools/st_emulator_main.cpp
-)
-target_link_libraries(st_emulator PRIVATE spartak_core)

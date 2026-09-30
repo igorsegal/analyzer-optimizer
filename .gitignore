@@ -46,7 +46,7 @@ ipch/
 *.recipe
 # Executables
 *.exe
-# Office artefacts (никогда не коммитим)
+# Office artefacts (РЅРёРєРѕРіРґР° РЅРµ РєРѕРјРјРёС‚РёРј)
 *.docx
 *.xlsx
 *.pptx
@@ -54,4 +54,8 @@ ipch/
 # System
 Thumbs.db
 desktop.ini
-.DS_Storeinstruments_scan_v4.csv
+.DS_Store
+
+
+csv/
+*.log

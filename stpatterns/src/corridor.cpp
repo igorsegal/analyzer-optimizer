@@ -50,29 +50,45 @@ static int find_stop_fractal(const std::vector<Fractal>& fractals,
     }
     return -1;
 }
+// Previous direction based on the LAST fractal before the corridor.
+// If the last fractal is UP  -> check UP pair (HH => +1).
+// If the last fractal is DOWN-> check DOWN pair (LL => -1).
+// Otherwise 0.
 static int find_previous_direction(const std::vector<Fractal>& fractals,
                                    int curr_idx)
 {
-    double last_up = 0.0, prev_up = 0.0;
-    int    up_cnt  = 0;
-    double last_dn = 0.0, prev_dn = 0.0;
-    int    dn_cnt  = 0;
+    // Find the most recent fully-formed fractal before the corridor.
+    int last_idx = -1;
     for (int k = curr_idx - 1; k >= 0; --k) {
-        const Fractal& f = fractals[k];
-        if (!f.fully_formed) continue;
-        if (f.type > 0) {
-            if (up_cnt == 0)      { last_up = f.price; ++up_cnt; }
-            else if (up_cnt == 1) { prev_up = f.price; ++up_cnt; }
-        } else {
-            if (dn_cnt == 0)      { last_dn = f.price; ++dn_cnt; }
-            else if (dn_cnt == 1) { prev_dn = f.price; ++dn_cnt; }
-        }
-        if (up_cnt >= 2 && dn_cnt >= 2) break;
+        if (fractals[k].fully_formed) { last_idx = k; break; }
     }
-    if (up_cnt == 2 && last_up > prev_up) return +1;
-    if (dn_cnt == 2 && last_dn < prev_dn) return -1;
-    return 0;
+    if (last_idx < 0) return 0;
+    int last_type = fractals[last_idx].type;
+    if (last_type > 0) {
+        // Find previous UP fractal before last_idx.
+        for (int k = last_idx - 1; k >= 0; --k) {
+            if (!fractals[k].fully_formed) continue;
+            if (fractals[k].type > 0) {
+                if (fractals[last_idx].price > fractals[k].price) return +1;
+                return 0;
+            }
+        }
+        return 0;
+    } else {
+        // Find previous DOWN fractal before last_idx.
+        for (int k = last_idx - 1; k >= 0; --k) {
+            if (!fractals[k].fully_formed) continue;
+            if (fractals[k].type < 0) {
+                if (fractals[last_idx].price < fractals[k].price) return -1;
+                return 0;
+            }
+        }
+        return 0;
+    }
 }
+// Not-fully-formed fractal at the bar before the break.
+// BUY  (dir > 0): potential DOWN fractal -> bar[break-1].low  < bar[break-2].low
+// SELL (dir < 0): potential UP   fractal -> bar[break-1].high > bar[break-2].high
 static bool find_not_fully_formed_stop(
     const std::vector<spartak::core::Bar>& bars,
     int break_idx,
@@ -83,9 +99,9 @@ static bool find_not_fully_formed_stop(
     const auto& L = bars[break_idx - 2];
     const auto& C = bars[break_idx - 1];
     if (dir > 0) {
-        if (C.high > L.high) { price = C.high; return true; }
+        if (C.low < L.low) { price = C.low; return true; }
     } else {
-        if (C.low < L.low)   { price = C.low;  return true; }
+        if (C.high > L.high) { price = C.high; return true; }
     }
     return false;
 }
@@ -188,6 +204,7 @@ std::vector<CorridorEvent> scan_corridors(
             double stop_line  = stop_full;
             double height     = height_full;
             int    height_pts = height_full_pts;
+            int    used_nff   = 0;
             if (same_dir) {
                 double cand_price = 0.0;
                 if (find_not_fully_formed_stop(bars, i, dir, cand_price)) {
@@ -198,6 +215,7 @@ std::vector<CorridorEvent> scan_corridors(
                         stop_line  = cand_price;
                         height     = std::fabs(start_line - cand_price);
                         height_pts = (int)(height / point + 0.5);
+                        used_nff   = 1;
                     }
                 }
             }
@@ -220,6 +238,8 @@ std::vector<CorridorEvent> scan_corridors(
             e.adr_pct     = (adr5_pts_local > 0)
                           ? height_pts * 100 / adr5_pts_local
                           : 0;
+            e.prev_dir_val = prev_dir;
+            e.used_nff     = used_nff;
             raw.push_back(e);
             break;
         }

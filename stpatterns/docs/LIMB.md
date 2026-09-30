@@ -12,7 +12,17 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ## Р¤РѕСЂРјР°С‚
 
-## LIMB-0020 - 2026-09-30 - STP
+## LIMB-0021 - 2026-09-30 - STP
+- Files:      stpatterns/tools/st_emulator_main.cpp
+- Type:       LOGIC
+- Reason:     Restrict universe to FX majors, crosses, and metals.
+              The ST Patterns method is designed for liquid FX and
+              metals (author uses EUR/USD, GBP/USD, AUD/USD). Stock
+              and crypto H1 data likely have different microstructure
+              and their point/digits vary. Whitelist by exact symbol.
+- Impact:     Cleaner stats on the intended universe.
+- Rollback:   LIMB-0020.
+- Status:     ACTIVE## LIMB-0020 - 2026-09-30 - STP
 - Files:      stpatterns/src/corridor.cpp
 - Type:       LOGIC
 - Reason:     Small corridors (H << threshold) produce R:R < 1 because

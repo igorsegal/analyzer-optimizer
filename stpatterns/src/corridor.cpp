@@ -5,40 +5,51 @@
 #include <cmath>
 #include <ctime>
 #include <algorithm>
-
 namespace st {
-
+static void utc_components(int64_t ms, int& year, int& mon, int& mday,
+                           int& hour, int& wday)
+{
+    std::time_t secs = (std::time_t)(ms / 1000);
+    std::tm tm{};
+#if defined(_MSC_VER)
+    gmtime_s(&tm, &secs);
+#else
+    gmtime_r(&secs, &tm);
+#endif
+    year = tm.tm_year + 1900;
+    mon  = tm.tm_mon + 1;
+    mday = tm.tm_mday;
+    hour = tm.tm_hour;
+    wday = tm.tm_wday;   // 0 = Sunday
+}
 static int day_key_from_ms(int64_t ms)
 {
-    std::time_t secs = (std::time_t)(ms / 1000);
-    std::tm tm{};
-#if defined(_MSC_VER)
-    gmtime_s(&tm, &secs);
-#else
-    gmtime_r(&secs, &tm);
-#endif
-    return (tm.tm_year + 1900) * 10000 + (tm.tm_mon + 1) * 100 + tm.tm_mday;
+    int y, m, d, h, w;
+    utc_components(ms, y, m, d, h, w);
+    return y * 10000 + m * 100 + d;
 }
-
 static int year_from_ms(int64_t ms)
 {
-    std::time_t secs = (std::time_t)(ms / 1000);
-    std::tm tm{};
-#if defined(_MSC_VER)
-    gmtime_s(&tm, &secs);
-#else
-    gmtime_r(&secs, &tm);
-#endif
-    return tm.tm_year + 1900;
+    int y, m, d, h, w;
+    utc_components(ms, y, m, d, h, w);
+    return y;
 }
-
+// Author page 80: trade 06:00-19:00 GMT, skip Fri after 20, Mon before 02.
+static bool in_session(int64_t ms)
+{
+    int y, m, d, h, w;
+    utc_components(ms, y, m, d, h, w);
+    if (h < 6 || h >= 19) return false;
+    if (w == 5 && h >= 20) return false;   // Friday evening
+    if (w == 1 && h < 2)   return false;   // Monday early
+    return true;
+}
 static int find_day_idx(const std::vector<DailyBar>& daily, int day_key)
 {
     for (int i = 0; i < (int)daily.size(); ++i)
         if (daily[i].day_key == day_key) return i;
     return -1;
 }
-
 static int find_stop_fractal(const std::vector<Fractal>& fractals,
                              int curr_idx,
                              int dir)
@@ -55,25 +66,16 @@ static int find_stop_fractal(const std::vector<Fractal>& fractals,
     }
     return -1;
 }
-
-// Previous direction based on the LAST fractal before the corridor.
-// If the last fractal is UP  -> check UP pair (HH => +1).
-// If the last fractal is DOWN-> check DOWN pair (LL => -1).
-// Otherwise 0.
 static int find_previous_direction(const std::vector<Fractal>& fractals,
                                    int curr_idx)
 {
-    // Find the most recent fully-formed fractal before the corridor.
     int last_idx = -1;
     for (int k = curr_idx - 1; k >= 0; --k) {
         if (fractals[k].fully_formed) { last_idx = k; break; }
     }
     if (last_idx < 0) return 0;
-
     int last_type = fractals[last_idx].type;
-
     if (last_type > 0) {
-        // Find previous UP fractal before last_idx.
         for (int k = last_idx - 1; k >= 0; --k) {
             if (!fractals[k].fully_formed) continue;
             if (fractals[k].type > 0) {
@@ -83,7 +85,6 @@ static int find_previous_direction(const std::vector<Fractal>& fractals,
         }
         return 0;
     } else {
-        // Find previous DOWN fractal before last_idx.
         for (int k = last_idx - 1; k >= 0; --k) {
             if (!fractals[k].fully_formed) continue;
             if (fractals[k].type < 0) {
@@ -94,10 +95,6 @@ static int find_previous_direction(const std::vector<Fractal>& fractals,
         return 0;
     }
 }
-
-// Not-fully-formed fractal at the bar before the break.
-// BUY  (dir > 0): potential DOWN fractal -> bar[break-1].low  < bar[break-2].low
-// SELL (dir < 0): potential UP   fractal -> bar[break-1].high > bar[break-2].high
 static bool find_not_fully_formed_stop(
     const std::vector<spartak::core::Bar>& bars,
     int break_idx,
@@ -107,7 +104,6 @@ static bool find_not_fully_formed_stop(
     if (break_idx < 2) return false;
     const auto& L = bars[break_idx - 2];
     const auto& C = bars[break_idx - 1];
-
     if (dir > 0) {
         if (C.low < L.low) { price = C.low; return true; }
     } else {
@@ -115,15 +111,16 @@ static bool find_not_fully_formed_stop(
     }
     return false;
 }
-
 static void simulate_exit(
     const std::vector<spartak::core::Bar>& bars,
     int    dir,
     int    entry_idx,
     double entry_price,
+    double start_line,
     double sl_initial,
-    double tp,
-    double be_trigger,
+    double height,
+    double tp_mult,
+    double be_mult,
     double point,
     int&   exit_idx,
     double& exit_price,
@@ -133,16 +130,21 @@ static void simulate_exit(
     exit_idx = -1;
     exit_price = entry_price;
     reason = "eod";
-
+    // Author: TP and BE trigger relative to start_line (broken fractal).
+    double tp = (dir > 0)
+              ? start_line + height * tp_mult
+              : start_line - height * tp_mult;
+    double be_trigger = (dir > 0)
+                      ? start_line + height * be_mult
+                      : start_line - height * be_mult;
     double sl = sl_initial;
     bool   be_moved = false;
-
     for (int i = entry_idx + 1; i < N; ++i) {
         if (dir > 0) {
             if (bars[i].high >= tp) {
                 exit_idx = i; exit_price = tp; reason = "tp"; return;
             }
-            if (!be_moved && bars[i].high >= entry_price + be_trigger) {
+            if (!be_moved && bars[i].high >= be_trigger) {
                 sl = entry_price;
                 be_moved = true;
             }
@@ -155,7 +157,7 @@ static void simulate_exit(
             if (bars[i].low <= tp) {
                 exit_idx = i; exit_price = tp; reason = "tp"; return;
             }
-            if (!be_moved && bars[i].low <= entry_price - be_trigger) {
+            if (!be_moved && bars[i].low <= be_trigger) {
                 sl = entry_price;
                 be_moved = true;
             }
@@ -167,7 +169,6 @@ static void simulate_exit(
         }
     }
 }
-
 std::vector<CorridorEvent> scan_corridors(
     const std::vector<spartak::core::Bar>& bars,
     const std::vector<Fractal>&            fractals,
@@ -181,25 +182,19 @@ std::vector<CorridorEvent> scan_corridors(
     std::vector<CorridorEvent> raw;
     if (fractals.size() < 2) return raw;
     const int N = (int)bars.size();
-
     for (size_t k = 1; k < fractals.size(); ++k) {
         const Fractal& curr = fractals[k];
         if (!curr.fully_formed) continue;
-
         int dir = (curr.type > 0) ? +1 : -1;
         int stop_k = find_stop_fractal(fractals, (int)k, dir);
         if (stop_k < 0) continue;
-
         double start_line = curr.price;
         double stop_full  = fractals[stop_k].price;
-
         if (dir > 0 && stop_full >= start_line) continue;
         if (dir < 0 && stop_full <= start_line) continue;
-
         double height_full = std::fabs(start_line - stop_full);
         if (height_full <= 0.0) continue;
         int height_full_pts = (int)(height_full / point + 0.5);
-
         int adr5_pts_local = 0;
         if (adr_filter) {
             int dk = day_key_from_ms(bars[curr.bar_idx].timestamp);
@@ -211,26 +206,21 @@ std::vector<CorridorEvent> scan_corridors(
             double max_h = adr_mult * adr5_pts_local;
             if ((double)height_full_pts > max_h) continue;
         }
-
         int prev_dir = find_previous_direction(fractals, (int)k);
         bool same_dir = (prev_dir == dir);
-
         for (int i = curr.bar_idx + 1; i < N; ++i) {
+            if (!in_session(bars[i].timestamp)) continue;
             double spread_pts = (double)bars[i].spread;
             if (spread_pts < 0) spread_pts = 0;
             double need = threshold_pts + spread_pts;
-
             bool triggered = false;
             if (dir > 0) triggered = (bars[i].high >= start_line + need * point);
             else         triggered = (bars[i].low  <= start_line - need * point);
-
             if (!triggered) continue;
-
             double stop_line  = stop_full;
             double height     = height_full;
             int    height_pts = height_full_pts;
             int    used_nff   = 0;
-
             if (same_dir) {
                 double cand_price = 0.0;
                 if (find_not_fully_formed_stop(bars, i, dir, cand_price)) {
@@ -245,7 +235,6 @@ std::vector<CorridorEvent> scan_corridors(
                     }
                 }
             }
-
             CorridorEvent e;
             e.dir         = dir;
             e.break_idx   = i;
@@ -271,7 +260,6 @@ std::vector<CorridorEvent> scan_corridors(
             break;
         }
     }
-
     std::sort(raw.begin(), raw.end(),
               [](const CorridorEvent& a, const CorridorEvent& b) {
                   return a.entry_idx < b.entry_idx;
@@ -284,35 +272,23 @@ std::vector<CorridorEvent> scan_corridors(
         unique_raw.push_back(e);
         last_idx = e.entry_idx;
     }
-
     std::vector<CorridorEvent> out;
     int last_exit_bar = -1;
-
     for (auto e : unique_raw) {
         if (e.entry_idx <= last_exit_bar) continue;
-
-        double tp = (e.dir > 0)
-            ? e.entry_price + e.height * tp_mult
-            : e.entry_price - e.height * tp_mult;
-        double sl = e.stop_line;
-        double be_trigger = 2.1 * e.height;
-
         int exit_idx; double exit_price; std::string reason;
         simulate_exit(bars, e.dir, e.entry_idx, e.entry_price,
-                      sl, tp, be_trigger, point,
+                      e.start_line, e.stop_line, e.height,
+                      tp_mult, 2.1, point,
                       exit_idx, exit_price, reason);
-
         e.exit_idx    = exit_idx;
         e.exit_price  = exit_price;
         e.exit_reason = reason;
-
         double dir_sign = (e.dir > 0) ? 1.0 : -1.0;
         e.pnl_pts = (exit_price - e.entry_price) * dir_sign / point;
-
         out.push_back(e);
         last_exit_bar = (exit_idx >= 0) ? exit_idx : N;
     }
     return out;
 }
-
 } // namespace st

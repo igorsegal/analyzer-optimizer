@@ -12,7 +12,19 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ## Р¤РѕСЂРјР°С‚
 
-## LIMB-0014 - 2026-09-30 - STP
+## LIMB-0017 - 2026-09-30 - STP
+- Files:      stpatterns/src/corridor.cpp
+- Type:       LOGIC
+- Reason:     Two fixes to match author literally:
+              (1) TP and BE triggers measured from start_line (broken
+                  fractal), not from entry_price. Book page 45:
+                  TP = 400% of height from broken fractal;
+                  BE trigger at 210% of height from broken fractal.
+              (2) Session filter (page 80): trade only 06:00-19:00 GMT,
+                  skip Friday after 20:00 GMT, skip Monday before 02:00.
+- Impact:     Different exit levels, filtered session.
+- Rollback:   LIMB-0016.
+- Status:     ACTIVE## LIMB-0014 - 2026-09-30 - STP
 - Files:      stpatterns/src/corridor.cpp
 - Type:       LOGIC
 - Reason:     Two bugs fixed:

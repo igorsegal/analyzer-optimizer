@@ -7,9 +7,8 @@
 #include "st/adr.h"
 #include "core/Types.h"
 #include <vector>
-
+#include <string>
 namespace st {
-
 struct CorridorEvent {
     int     dir;
     int     break_idx;
@@ -20,14 +19,15 @@ struct CorridorEvent {
     double  height;
     int     height_pts;
     int     adr5_pts;
-
-    // Simulated position (for non-overlap filter).
     int     exit_idx;
     double  exit_price;
-    double  pnl_pts;      // signed, in points
-    std::string exit_reason;   // "sl" | "tp" | "eod"
+    double  pnl_pts;
+    std::string exit_reason;
+    int     year;
+    int     adr_pct;
+    int     prev_dir_val;
+    int     used_nff;
 };
-
 std::vector<CorridorEvent> scan_corridors(
     const std::vector<spartak::core::Bar>& bars,
     const std::vector<Fractal>&            fractals,
@@ -37,5 +37,4 @@ std::vector<CorridorEvent> scan_corridors(
     bool   adr_filter,
     double adr_mult,
     double tp_mult);
-
 } // namespace st

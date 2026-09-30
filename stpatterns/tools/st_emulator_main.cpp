@@ -38,34 +38,58 @@ int main(int argc, char** argv)
     std::printf("fract : %zu\n", fr.size());
     std::printf("daily : %zu\n", daily.size());
 
-    // Point from first bar (approx).
-    double point = 0.00001;   // EURUSD M5/H1 5 digits
+    double point     = 0.00001;
     double threshold = 70.0;
+    double tp_mult   = 4.0;
 
-    auto sig = st::scan_corridors(bars, fr, daily, point, threshold, true, 0.5);
-    std::printf("\nsignals (ADR filter on): %zu\n", sig.size());
+    auto sig = st::scan_corridors(bars, fr, daily, point,
+                                  threshold, true, 0.5, tp_mult);
+
+    std::printf("\ntrades (non-overlap): %zu\n", sig.size());
 
     int buy = 0, sell = 0;
-    for (auto& e : sig) { if (e.dir > 0) ++buy; else ++sell; }
+    int wins = 0, losses = 0, eod = 0;
+    double sum_win = 0.0, sum_loss = 0.0, sum_pts = 0.0;
+    for (auto& e : sig) {
+        if (e.dir > 0) ++buy; else ++sell;
+        sum_pts += e.pnl_pts;
+        if (e.exit_reason == "tp") { ++wins;   sum_win  += e.pnl_pts; }
+        else if (e.exit_reason == "sl") { ++losses; sum_loss += -e.pnl_pts; }
+        else { ++eod; }
+    }
     std::printf("  buy : %d\n", buy);
     std::printf("  sell: %d\n", sell);
+    std::printf("\nresults:\n");
+    std::printf("  wins  : %d\n", wins);
+    std::printf("  losses: %d\n", losses);
+    std::printf("  eod   : %d\n", eod);
+    if (wins + losses > 0)
+        std::printf("  WR    : %.2f%%\n",
+                    100.0 * wins / (wins + losses));
+    if (sum_loss > 0.0)
+        std::printf("  PF    : %.3f\n", sum_win / sum_loss);
+    std::printf("  total : %.0f pts\n", sum_pts);
+    std::printf("  avg/trade: %.1f pts\n",
+                sig.empty() ? 0.0 : sum_pts / sig.size());
 
-    std::printf("\nfirst 10 signals:\n");
-    for (int i = 0; i < (int)sig.size() && i < 10; ++i) {
+    std::printf("\nfirst 5 trades:\n");
+    for (int i = 0; i < (int)sig.size() && i < 5; ++i) {
         auto& e = sig[i];
-        std::printf("  #%d %s idx=%d  entry=%.5f  sl=%.5f  h=%d pts\n",
+        std::printf("  #%d %s  entry_idx=%d exit_idx=%d  entry=%.5f exit=%.5f  %s  pnl=%.0f pts\n",
                     i, (e.dir > 0 ? "BUY " : "SELL"),
-                    e.entry_idx, e.entry_price, e.stop_line, e.height_pts);
+                    e.entry_idx, e.exit_idx,
+                    e.entry_price, e.exit_price,
+                    e.exit_reason.c_str(), e.pnl_pts);
     }
-
-    std::printf("\nlast 5 signals:\n");
-    int s = (int)sig.size() - 5;
-    if (s < 0) s = 0;
+    std::printf("\nlast 5 trades:\n");
+    int s = (int)sig.size() - 5; if (s < 0) s = 0;
     for (int i = s; i < (int)sig.size(); ++i) {
         auto& e = sig[i];
-        std::printf("  #%d %s idx=%d  entry=%.5f  sl=%.5f  h=%d pts\n",
+        std::printf("  #%d %s  entry_idx=%d exit_idx=%d  entry=%.5f exit=%.5f  %s  pnl=%.0f pts\n",
                     i, (e.dir > 0 ? "BUY " : "SELL"),
-                    e.entry_idx, e.entry_price, e.stop_line, e.height_pts);
+                    e.entry_idx, e.exit_idx,
+                    e.entry_price, e.exit_price,
+                    e.exit_reason.c_str(), e.pnl_pts);
     }
     return 0;
 }

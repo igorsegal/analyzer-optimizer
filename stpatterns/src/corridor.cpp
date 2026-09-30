@@ -181,6 +181,7 @@ std::vector<CorridorEvent> scan_corridors(
     const int N = (int)bars.size();
     // Threshold as fraction of ADR(5).
     const double threshold_frac = 0.12;
+    const double min_rr = 1.5;
     for (size_t k = 1; k < fractals.size(); ++k) {
         const Fractal& curr = fractals[k];
         if (!curr.fully_formed) continue;
@@ -241,15 +242,26 @@ std::vector<CorridorEvent> scan_corridors(
                     }
                 }
             }
+            double entry_px = (dir > 0)
+                            ? start_line + need * point
+                            : start_line - need * point;
+            double tp_px    = (dir > 0)
+                            ? start_line + height * tp_mult
+                            : start_line - height * tp_mult;
+            double dist_tp  = (dir > 0) ? (tp_px - entry_px)
+                                        : (entry_px - tp_px);
+            double dist_sl  = (dir > 0) ? (entry_px - stop_line)
+                                        : (stop_line - entry_px);
+            if (dist_sl <= 0.0) continue;
+            double rr_val = dist_tp / dist_sl;
+            if (rr_val < min_rr) continue;
             CorridorEvent e;
             e.dir         = dir;
             e.break_idx   = i;
             e.entry_idx   = i;
             e.start_line  = start_line;
             e.stop_line   = stop_line;
-            e.entry_price = (dir > 0)
-                          ? start_line + need * point
-                          : start_line - need * point;
+            e.entry_price = entry_px;
             e.height      = height;
             e.height_pts  = height_pts;
             e.adr5_pts    = adr5_pts_local;

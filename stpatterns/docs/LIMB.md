@@ -12,7 +12,15 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ## Р¤РѕСЂРјР°С‚
 
-## LIMB-0019 - 2026-09-30 - STP
+## LIMB-0020 - 2026-09-30 - STP
+- Files:      stpatterns/src/corridor.cpp
+- Type:       LOGIC
+- Reason:     Small corridors (H << threshold) produce R:R < 1 because
+              entry = start + 0.12*ADR sits close to or above TP.
+              Add min_rr filter (default 1.5) before entering trade.
+- Impact:     Drop losing tail in bucket 0-20.
+- Rollback:   LIMB-0019.
+- Status:     ACTIVE## LIMB-0019 - 2026-09-30 - STP
 - Files:      stpatterns/src/corridor.cpp,
               stpatterns/tools/st_emulator_main.cpp
 - Type:       LOGIC

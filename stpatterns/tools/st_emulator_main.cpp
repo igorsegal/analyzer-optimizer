@@ -1,11 +1,11 @@
 // =============================================================================
 //  STPatterns :: st_emulator_main.cpp
-//  Read XFBAR, detect fractals, build daily, print ADR(5).
 // =============================================================================
 #include "data/BarStream.h"
 #include "core/Types.h"
 #include "st/fractal.h"
 #include "st/adr.h"
+#include "st/corridor.h"
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -27,38 +27,45 @@ int main(int argc, char** argv)
     std::vector<spartak::core::Bar> bars;
     spartak::core::Bar b;
     while (stream.next(b)) bars.push_back(b);
+    if (bars.empty()) return 1;
 
     std::printf("file  : %s\n", path.c_str());
     std::printf("bars  : %zu\n", bars.size());
-    if (bars.empty()) return 1;
 
-    // --- Fractals ---
-    auto fr = st::find_fractals(bars);
-    int up = 0, dn = 0;
-    for (auto& f : fr) { if (f.type > 0) ++up; else ++dn; }
-    std::printf("fract : %zu total (up=%d dn=%d) = %.2f per 100 bars\n",
-                fr.size(), up, dn, 100.0 * fr.size() / bars.size());
-
-    // --- Daily + ADR ---
+    auto fr    = st::find_fractals(bars);
     auto daily = st::build_daily(bars);
-    std::printf("daily : %zu days\n", daily.size());
 
-    std::printf("\nADR(5) sample (10 days starting from day 20):\n");
-    for (int i = 20; i < (int)daily.size() && i < 30; ++i) {
-        double a = st::adr5_at(daily, i);
-        std::printf("  day %4d  key=%08d  high=%.5f  low=%.5f  range=%.5f  ADR5=%.5f\n",
-                    i, daily[i].day_key, daily[i].high, daily[i].low,
-                    daily[i].high - daily[i].low, a);
+    std::printf("fract : %zu\n", fr.size());
+    std::printf("daily : %zu\n", daily.size());
+
+    // Point from first bar (approx).
+    double point = 0.00001;   // EURUSD M5/H1 5 digits
+    double threshold = 7.0;
+
+    auto sig = st::scan_corridors(bars, fr, daily, point, threshold, true, 0.5);
+    std::printf("\nsignals (ADR filter on): %zu\n", sig.size());
+
+    int buy = 0, sell = 0;
+    for (auto& e : sig) { if (e.dir > 0) ++buy; else ++sell; }
+    std::printf("  buy : %d\n", buy);
+    std::printf("  sell: %d\n", sell);
+
+    std::printf("\nfirst 10 signals:\n");
+    for (int i = 0; i < (int)sig.size() && i < 10; ++i) {
+        auto& e = sig[i];
+        std::printf("  #%d %s idx=%d  entry=%.5f  sl=%.5f  h=%d pts\n",
+                    i, (e.dir > 0 ? "BUY " : "SELL"),
+                    e.entry_idx, e.entry_price, e.stop_line, e.height_pts);
     }
 
-    std::printf("\nlast 5 days:\n");
-    int start = (int)daily.size() - 5;
-    if (start < 0) start = 0;
-    for (int i = start; i < (int)daily.size(); ++i) {
-        double a = st::adr5_at(daily, i);
-        std::printf("  day %4d  key=%08d  high=%.5f  low=%.5f  range=%.5f  ADR5=%.5f\n",
-                    i, daily[i].day_key, daily[i].high, daily[i].low,
-                    daily[i].high - daily[i].low, a);
+    std::printf("\nlast 5 signals:\n");
+    int s = (int)sig.size() - 5;
+    if (s < 0) s = 0;
+    for (int i = s; i < (int)sig.size(); ++i) {
+        auto& e = sig[i];
+        std::printf("  #%d %s idx=%d  entry=%.5f  sl=%.5f  h=%d pts\n",
+                    i, (e.dir > 0 ? "BUY " : "SELL"),
+                    e.entry_idx, e.entry_price, e.stop_line, e.height_pts);
     }
     return 0;
 }

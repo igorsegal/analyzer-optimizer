@@ -25,6 +25,20 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 - Impact:     Previous-direction and not-fully-formed stop may
               finally activate.
 - Rollback:   LIMB-0012 logic.
+- Status:     ACTIVE
+## LIMB-0014 - 2026-09-30 - STP
+- Files:      stpatterns/src/corridor.cpp
+- Type:       LOGIC
+- Reason:     Two bugs fixed:
+              (1) find_not_fully_formed_stop had swapped conditions.
+                  BUY must check LOW (potential DOWN fractal),
+                  SELL must check HIGH (potential UP fractal).
+              (2) find_previous_direction required both UP and DOWN
+                  pairs to be unambiguous. Now uses the LAST fractal
+                  before the corridor to pick which pair to check.
+- Impact:     Previous-direction and not-fully-formed stop may
+              finally activate.
+- Rollback:   LIMB-0012 logic.
 - Status:     ACTIVE## LIMB-0012 - 2026-09-30 - STP
 - Files:      stpatterns/src/corridor.cpp
 - Type:       LOGIC

@@ -148,11 +148,11 @@ target_link_libraries(smoke_trailing     PRIVATE spartak_core)
 target_link_libraries(smoke_emergency    PRIVATE spartak_core)
 
 enable_testing()
+target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/stpatterns/include)
 # -----------------------------------------------------------------------------
 #  STPatterns emulator
 # -----------------------------------------------------------------------------
 add_executable(st_emulator
     stpatterns/tools/st_emulator_main.cpp
 )
-target_include_directories(st_emulator PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/stpatterns/include)
 target_link_libraries(st_emulator PRIVATE spartak_core)

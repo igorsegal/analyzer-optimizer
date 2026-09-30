@@ -12,7 +12,20 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ## Р¤РѕСЂРјР°С‚
 
-## LIMB-0018 - 2026-09-30 - STP
+## LIMB-0019 - 2026-09-30 - STP
+- Files:      stpatterns/src/corridor.cpp,
+              stpatterns/tools/st_emulator_main.cpp
+- Type:       LOGIC
+- Reason:     (1) main.cpp reads point from file header
+                  (XFBarReader::header().point) instead of hardcoded 0.00001.
+              (2) threshold computed as 12% of ADR(5) in local points.
+                  For EURUSD ~60 pips ADR -> ~7 pips threshold (author).
+                  For other instruments scales automatically.
+              (3) adr5_pts now computed from real daily range in local points.
+              (4) MAX_H filter moved to pct of ADR (12-50%) to allow threshold < max.
+- Impact:     Multi-symbol scan gives meaningful numbers.
+- Rollback:   LIMB-0018.
+- Status:     ACTIVE## LIMB-0018 - 2026-09-30 - STP
 - Files:      stpatterns/src/corridor.cpp,
               stpatterns/tools/st_emulator_main.cpp
 - Type:       LOGIC

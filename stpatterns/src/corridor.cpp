@@ -65,12 +65,11 @@ static int find_stop_fractal(const std::vector<Fractal>& fractals,
     }
     return -1;
 }
-// Prev direction: check both pairs (HH and LL), prefer the more recent.
 static int find_previous_direction(const std::vector<Fractal>& fractals,
                                    int curr_idx)
 {
-    int    up1 = -1, up2 = -1;
-    int    dn1 = -1, dn2 = -1;
+    int up1 = -1, up2 = -1;
+    int dn1 = -1, dn2 = -1;
     for (int k = curr_idx - 1; k >= 0; --k) {
         if (!fractals[k].fully_formed) continue;
         if (fractals[k].type > 0) {
@@ -91,10 +90,7 @@ static int find_previous_direction(const std::vector<Fractal>& fractals,
     }
     if (hh && !ll) return +1;
     if (ll && !hh) return -1;
-    if (hh && ll) {
-        // Prefer the more recent fractal.
-        return (up_idx > dn_idx) ? +1 : -1;
-    }
+    if (hh && ll) return (up_idx > dn_idx) ? +1 : -1;
     return 0;
 }
 static bool find_not_fully_formed_stop(
@@ -175,14 +171,16 @@ std::vector<CorridorEvent> scan_corridors(
     const std::vector<Fractal>&            fractals,
     const std::vector<DailyBar>&           daily,
     double point,
-    double threshold_pts,
     bool   adr_filter,
     double adr_mult,
     double tp_mult)
 {
     std::vector<CorridorEvent> raw;
     if (fractals.size() < 2) return raw;
+    if (point <= 0.0) return raw;
     const int N = (int)bars.size();
+    // Threshold as fraction of ADR(5).
+    const double threshold_frac = 0.12;
     for (size_t k = 1; k < fractals.size(); ++k) {
         const Fractal& curr = fractals[k];
         if (!curr.fully_formed) continue;
@@ -197,23 +195,30 @@ std::vector<CorridorEvent> scan_corridors(
         if (height_full <= 0.0) continue;
         int height_full_pts = (int)(height_full / point + 0.5);
         int adr5_pts_local = 0;
+        double adr5_price  = 0.0;
         if (adr_filter) {
             int dk = day_key_from_ms(bars[curr.bar_idx].timestamp);
             int di = find_day_idx(daily, dk);
             if (di < 5) continue;
-            double adr5 = adr5_at(daily, di);
-            if (adr5 <= 0.0) continue;
-            adr5_pts_local = (int)(adr5 / point + 0.5);
+            adr5_price = adr5_at(daily, di);
+            if (adr5_price <= 0.0) continue;
+            adr5_pts_local = (int)(adr5_price / point + 0.5);
+            if (adr5_pts_local <= 0) continue;
             double max_h = adr_mult * adr5_pts_local;
             if ((double)height_full_pts > max_h) continue;
+        } else {
+            adr5_price = height_full / 0.25;
+            adr5_pts_local = (int)(adr5_price / point + 0.5);
         }
+        double need_pts = threshold_frac * adr5_pts_local;
+        if (need_pts < 1.0) need_pts = 1.0;
         int prev_dir = find_previous_direction(fractals, (int)k);
         bool same_dir = (prev_dir == dir);
         for (int i = curr.bar_idx + 1; i < N; ++i) {
             if (!in_session(bars[i].timestamp)) continue;
             double spread_pts = (double)bars[i].spread;
             if (spread_pts < 0) spread_pts = 0;
-            double need = threshold_pts + spread_pts;
+            double need = need_pts + spread_pts;
             bool triggered = false;
             if (dir > 0) triggered = (bars[i].high >= start_line + need * point);
             else         triggered = (bars[i].low  <= start_line - need * point);

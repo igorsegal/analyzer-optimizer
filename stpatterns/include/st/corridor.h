@@ -33,7 +33,6 @@ std::vector<CorridorEvent> scan_corridors(
     const std::vector<Fractal>&            fractals,
     const std::vector<DailyBar>&           daily,
     double point,
-    double threshold_pts,
     bool   adr_filter,
     double adr_mult,
     double tp_mult);

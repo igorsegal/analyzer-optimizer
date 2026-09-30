@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 
     // Point from first bar (approx).
     double point = 0.00001;   // EURUSD M5/H1 5 digits
-    double threshold = 7.0;
+    double threshold = 70.0;
 
     auto sig = st::scan_corridors(bars, fr, daily, point, threshold, true, 0.5);
     std::printf("\nsignals (ADR filter on): %zu\n", sig.size());

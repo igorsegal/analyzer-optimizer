@@ -39,23 +39,13 @@ std::vector<CorridorEvent> scan_corridors(
     if (fractals.size() < 2) return out;
     const int N = (int)bars.size();
 
-    // Track bars already consumed by a signal to avoid duplicates.
-    int last_break_bar = -1;
-
     for (size_t k = 1; k < fractals.size(); ++k) {
         const Fractal& prev = fractals[k - 1];
         const Fractal& curr = fractals[k];
 
-        // Corridor needs OPPOSITE fractals.
         if (prev.type == curr.type) continue;
-
-        // Only fully-formed fractals (both neighbors existed).
         if (!prev.fully_formed || !curr.fully_formed) continue;
 
-        // Determine corridor direction: which fractal is "broken".
-        // The more recent fractal (curr) is the potential break level.
-        // Break direction: if curr is a DOWN fractal, price must close BELOW
-        // its low -> SELL setup. If curr is UP, BUY setup on break above.
         int dir = (curr.type > 0) ? +1 : -1;
         double start_line = curr.price;
         double stop_line  = prev.price;
@@ -64,7 +54,6 @@ std::vector<CorridorEvent> scan_corridors(
         if (height <= 0.0) continue;
         int height_pts = (int)(height / point + 0.5);
 
-        // ADR filter
         if (adr_filter) {
             int dk = day_key_from_ms(bars[curr.bar_idx].timestamp);
             int di = find_day_idx(daily, dk);
@@ -76,18 +65,14 @@ std::vector<CorridorEvent> scan_corridors(
             if ((double)height_pts > max_h) continue;
         }
 
-        // Look for break after curr.bar_idx.
-        // Skip bars already used.
         int start_scan = curr.bar_idx + 1;
-        if (start_scan <= last_break_bar) start_scan = last_break_bar + 1;
 
         for (int i = start_scan; i < N; ++i) {
-            if (bars[i].spread < 0) continue;
             double spread_pts = (double)bars[i].spread;
+            if (spread_pts < 0) spread_pts = 0;
             double need = threshold_pts + spread_pts;
 
             if (dir > 0) {
-                // BUY: bar.low touched start_line and closed above
                 if (bars[i].high >= start_line + need * point) {
                     CorridorEvent e;
                     e.dir         = +1;
@@ -100,7 +85,6 @@ std::vector<CorridorEvent> scan_corridors(
                     e.height_pts  = height_pts;
                     e.adr5_pts    = 0;
                     out.push_back(e);
-                    last_break_bar = i;
                     break;
                 }
             } else {
@@ -116,7 +100,6 @@ std::vector<CorridorEvent> scan_corridors(
                     e.height_pts  = height_pts;
                     e.adr5_pts    = 0;
                     out.push_back(e);
-                    last_break_bar = i;
                     break;
                 }
             }

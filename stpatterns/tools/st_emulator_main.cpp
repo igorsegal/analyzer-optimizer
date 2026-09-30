@@ -1,10 +1,11 @@
 // =============================================================================
 //  STPatterns :: st_emulator_main.cpp
-//  Read XFBAR, detect fractals, print summary.
+//  Read XFBAR, detect fractals, build daily, print ADR(5).
 // =============================================================================
 #include "data/BarStream.h"
 #include "core/Types.h"
 #include "st/fractal.h"
+#include "st/adr.h"
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -31,27 +32,33 @@ int main(int argc, char** argv)
     std::printf("bars  : %zu\n", bars.size());
     if (bars.empty()) return 1;
 
+    // --- Fractals ---
     auto fr = st::find_fractals(bars);
-
     int up = 0, dn = 0;
     for (auto& f : fr) { if (f.type > 0) ++up; else ++dn; }
+    std::printf("fract : %zu total (up=%d dn=%d) = %.2f per 100 bars\n",
+                fr.size(), up, dn, 100.0 * fr.size() / bars.size());
 
-    std::printf("total : %zu fractals (up=%d dn=%d)\n", fr.size(), up, dn);
-    std::printf("rate  : %.2f fractals / 100 bars\n",
-                100.0 * fr.size() / bars.size());
-    std::printf("\nfirst 5 fractals:\n");
-    for (int i = 0; i < (int)fr.size() && i < 5; ++i) {
-        std::printf("  #%d %s idx=%d  price=%.5f\n",
-                    i, (fr[i].type > 0) ? "UP  " : "DOWN",
-                    fr[i].bar_idx, fr[i].price);
+    // --- Daily + ADR ---
+    auto daily = st::build_daily(bars);
+    std::printf("daily : %zu days\n", daily.size());
+
+    std::printf("\nADR(5) sample (10 days starting from day 20):\n");
+    for (int i = 20; i < (int)daily.size() && i < 30; ++i) {
+        double a = st::adr5_at(daily, i);
+        std::printf("  day %4d  key=%08d  high=%.5f  low=%.5f  range=%.5f  ADR5=%.5f\n",
+                    i, daily[i].day_key, daily[i].high, daily[i].low,
+                    daily[i].high - daily[i].low, a);
     }
-    std::printf("\nlast 5 fractals:\n");
-    int start = (int)fr.size() - 5;
+
+    std::printf("\nlast 5 days:\n");
+    int start = (int)daily.size() - 5;
     if (start < 0) start = 0;
-    for (int i = start; i < (int)fr.size(); ++i) {
-        std::printf("  #%d %s idx=%d  price=%.5f\n",
-                    i, (fr[i].type > 0) ? "UP  " : "DOWN",
-                    fr[i].bar_idx, fr[i].price);
+    for (int i = start; i < (int)daily.size(); ++i) {
+        double a = st::adr5_at(daily, i);
+        std::printf("  day %4d  key=%08d  high=%.5f  low=%.5f  range=%.5f  ADR5=%.5f\n",
+                    i, daily[i].day_key, daily[i].high, daily[i].low,
+                    daily[i].high - daily[i].low, a);
     }
     return 0;
 }

@@ -58,6 +58,7 @@ add_library(spartak_core STATIC
     src/engine/BacktestPlayer.cpp
     src/engine/PortfolioBacktest.cpp
     stpatterns/src/fractal.cpp
+    stpatterns/src/adr.cpp
 )
 target_include_directories(spartak_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_features(spartak_core PUBLIC cxx_std_20)

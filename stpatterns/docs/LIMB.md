@@ -22,6 +22,19 @@ R5. Р—Р°РїРёСЃРё РІ РѕР±СЂР°С‚РЅРѕРј РїРѕС�
 
 ---
 
+## LIMB-0003 - 2026-09-30 - STP
+- Р¤Р°Р№Р»С‹:      stpatterns/include/st/adr.h,
+              stpatterns/src/adr.cpp,
+              stpatterns/tools/st_emulator_main.cpp,
+              CMakeLists.txt
+- РўРёРї:        MODULE
+- РџСЂРёС‡РёРЅР°:    ADR(5) - СЃСЂРµРґРЅРёР№ РґРЅРµРІРЅРѕР№ РґРёР°РїР°Р·РѕРЅ Р·Р° 5 РїСЂРµРґС‹РґСѓС‰РёС… РґРЅРµР№.
+              Р¤РѕСЂРјСѓР»Р° Р°РІС‚РѕСЂР°:
+              ADR(5) = sum(D1_Hi - D1_Li, i=1..5) / 5
+              D1 Р±Р°СЂС‹ СЃС‚СЂРѕСЏС‚СЃСЏ РёР· H1 РіСЂСѓРїРїРёСЂРѕРІРєРѕР№ РїРѕ UTC РґР°С‚Рµ.
+- Р’Р»РёСЏРЅРёРµ:    Р¤РёР»СЊС‚СЂ РєРѕСЂРёРґРѕСЂРѕРІ (corridor.height <= 0.5 * ADR).
+- РћС‚РєР°С‚:      РЈРґР°Р»РёС‚СЊ adr.h/cpp, РѕС‚РєР°С‚РёС‚СЊ main.
+- РЎС‚Р°С‚СѓСЃ:     ACTIVE
 ## LIMB-0002 - 2026-09-30 - STP
 - Р¤Р°Р№Р»С‹:      stpatterns/include/st/fractal.h,
               stpatterns/src/fractal.cpp,

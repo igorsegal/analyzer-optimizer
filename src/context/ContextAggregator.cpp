@@ -3,6 +3,7 @@
 #include "context/LowExtractor.h"
 #include "context/StructureValidatorHHHL.h"
 #include <algorithm>
+#include <iostream>
 #include <stdexcept>
 namespace spartak::context {
 // -----------------------------------------------------------------------------

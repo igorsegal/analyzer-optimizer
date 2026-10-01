@@ -28,11 +28,11 @@ struct SourceZone {
     core::TrendDirection   direction = core::TrendDirection::Undefined;
 };
 struct SourceZoneConfig {
-    std::size_t min_bars_in_zone = 10;   // минимум баров в консолидации
-    std::size_t max_bars_in_zone = 50;   // максимум баров
-    int         max_range_points = 30;   // макс. разброс в зоне
-    int         breakout_points  = 20;   // мин. выход за границу
-    int         confirm_bars     = 10;   // сколько баров без возврата
+    std::size_t min_bars_in_zone = 15;    // минимум баров в консолидации
+    std::size_t max_bars_in_zone = 80;    // максимум баров
+    int         max_range_points = 2000;  // макс. разброс в зоне (200 пипсов)
+    int         breakout_points  = 500;   // мин. выход за границу (50 пипсов)
+    int         confirm_bars     = 5;     // сколько баров без возврата
     double      point            = 0.00001;
 };
 class SourceZoneDetector {

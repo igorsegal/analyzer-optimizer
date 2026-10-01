@@ -1,4 +1,4 @@
-﻿#include "validation/SignalValidator.h"
+#include "validation/SignalValidator.h"
 #include <cmath>
 #include <algorithm>
 #include <functional>
@@ -64,6 +64,29 @@ ValidationResult SignalValidator::validate(
     if (!ct.allowed) {
         return reject(core::RejectReason::TrendConflict,
                       ct.is_counter ? "counter-trend without PU" : "trend conflict");
+    }
+    // 3b) ТВ-правило №4: стоп должен быть ЗА зоной (по ТЗ ч.6).
+    // BUY: stop < zone_bottom. SELL: stop > zone_top.
+    {
+        const auto* match = static_cast<const core::PriceZone*>(nullptr);
+        double best_d = 1e18;
+        for (const auto& z : ctx.active_zones) {
+            if (!z.is_active) continue;
+            const double d = std::fabs(z.price_level - sig.level);
+            if (d < best_d) { best_d = d; match = &z; }
+        }
+        if (match) {
+            if (sig.side == core::OrderSide::Buy &&
+                sig.suggested_stop >= match->zone_bottom) {
+                return reject(core::RejectReason::InvalidStop,
+                              "BUY stop not below zone_bottom");
+            }
+            if (sig.side == core::OrderSide::Sell &&
+                sig.suggested_stop <= match->zone_top) {
+                return reject(core::RejectReason::InvalidStop,
+                              "SELL stop not above zone_top");
+            }
+        }
     }
     // 4) Сырой лот (с учётом комиссии)
     const double raw_lot = money_.calcRawLotWithCommission(

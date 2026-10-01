@@ -28,6 +28,7 @@ add_library(spartak_core STATIC
     src/context/TrendBiasEvaluator.cpp
     src/context/ContextAggregator.cpp
     src/context/SourceZoneDetector.cpp
+    src/context/BalanceShiftDetector.cpp
     src/patterns/CandleGeometryCalculator.cpp
     src/patterns/TickVolumeFilter.cpp
     src/patterns/BarCloseConfirmationCounter.cpp

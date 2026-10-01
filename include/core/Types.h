@@ -91,6 +91,9 @@ struct PatternSignal {
     OrderSide   side           = OrderSide::Buy;
     PatternType type           = PatternType::None;
     RMCategory  rm_category    = RMCategory::None;
+    // ТЗ ч.5: добор ликвидности в фазе распределения создаёт новый источник тренда.
+    // Если true — цель смещается ЗА источник, а не К источнику.
+    bool        did_create_new_source = false;
     double      trigger_price  = 0.0;
     double      level          = 0.0;
     double      suggested_stop = 0.0;

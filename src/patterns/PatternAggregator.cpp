@@ -1,4 +1,4 @@
-﻿#include "patterns/PatternAggregator.h"
+#include "patterns/PatternAggregator.h"
 #include <algorithm>
 #include <stdexcept>
 namespace spartak::patterns {
@@ -41,6 +41,7 @@ core::PatternSignal PatternAggregator::analyze(
                 s.detected      = true;
                 s.side          = core::OrderSide::Buy;
                 s.type          = core::PatternType::FalseBreakout;
+                s.rm_category   = core::RMCategory::RM_1_1;
                 s.trigger_price = pb.trigger_price;
                 s.level         = zone.price_level;
                 s.suggested_stop = pb.suggested_stop;
@@ -54,6 +55,7 @@ core::PatternSignal PatternAggregator::analyze(
                 s.detected      = true;
                 s.side          = core::OrderSide::Sell;
                 s.type          = core::PatternType::FalseBreakout;
+                s.rm_category   = core::RMCategory::RM_1_1;
                 s.trigger_price = ps.trigger_price;
                 s.level         = zone.price_level;
                 s.suggested_stop = ps.suggested_stop;
@@ -71,6 +73,7 @@ core::PatternSignal PatternAggregator::analyze(
             s.side          = eng.is_bullish ? core::OrderSide::Buy
                                              : core::OrderSide::Sell;
             s.type          = core::PatternType::FalseBreakout;
+            s.rm_category   = core::RMCategory::RM_1_2;
             s.trigger_price = eng.trigger_price;
             s.level         = eng.trigger_price;   // уровень = точка входа
             s.suggested_stop = eng.suggested_stop;
@@ -88,6 +91,7 @@ core::PatternSignal PatternAggregator::analyze(
             s.side          = imp.is_bullish ? core::OrderSide::Buy
                                              : core::OrderSide::Sell;
             s.type          = core::PatternType::ImpulseBreakout;
+            s.rm_category   = core::RMCategory::RM_2_1;
             s.trigger_price = imp.trigger_price;
             s.level         = zone.price_level;
             s.suggested_stop = imp.suggested_stop;
@@ -114,6 +118,7 @@ core::PatternSignal PatternAggregator::analyze(
                                 ? core::OrderSide::Buy
                                 : core::OrderSide::Sell;
                 s.type          = core::PatternType::Consolidation;
+                s.rm_category   = core::RMCategory::RM_2_2;
                 s.trigger_price = bar.close;
                 s.level         = ib.mother_high;   // верхняя граница сжатия
                 s.suggested_stop = (s.side == core::OrderSide::Buy)

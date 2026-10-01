@@ -59,6 +59,14 @@ struct MarketContext {
     bool                   trend_conflict  = false;
     std::vector<PriceZone> active_zones;
     bool                   has_hh_hl_structure = false;
+    // ТЗ ч.4, ч.5: источник тренда и область разворота тенденции.
+    // Заполняются в ContextAggregator; 0.0 означает «не найден».
+    double source_level = 0.0;   // цена уровня, откуда вышел тренд
+    double source_top   = 0.0;   // верх зоны источника
+    double source_bottom = 0.0;  // низ зоны источника
+    bool   has_source   = false;
+    double ort_level    = 0.0;   // область разворота тенденции (за источником)
+    bool   has_ort      = false;
 };
 // -----------------------------------------------------------------------------
 // 4. Направление торговой позиции

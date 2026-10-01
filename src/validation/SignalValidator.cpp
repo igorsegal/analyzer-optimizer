@@ -132,47 +132,82 @@ ValidationResult SignalValidator::validate(
     //    BUY:  3 ближайшие зоны выше entry, сортируем по возрастанию price_level
     //    SELL: 3 ближайшие зоны ниже entry, сортируем по убыванию price_level
     //    Если зон меньше 3 — fallback: entry ± stop_dist * {1, 2, 3}
-    std::vector<double> tp_candidates;
-    for (const auto& z : ctx.active_zones) {
-        if (!z.is_active) continue;
-        if (sig.side == core::OrderSide::Buy && z.price_level > sig.trigger_price)
-            tp_candidates.push_back(z.price_level);
-        if (sig.side == core::OrderSide::Sell && z.price_level < sig.trigger_price)
-            tp_candidates.push_back(z.price_level);
-    }
-    if (sig.side == core::OrderSide::Buy)
-        std::sort(tp_candidates.begin(), tp_candidates.end());
-    else
-        std::sort(tp_candidates.begin(), tp_candidates.end(), std::greater<double>());
     double tp1 = 0.0, tp2 = 0.0, tp3 = 0.0;
-    if (tp_candidates.size() >= 3) {
-        tp1 = tp_candidates[0];
-        tp2 = tp_candidates[1];
-        tp3 = tp_candidates[2];
-    } else if (tp_candidates.size() == 2) {
-        tp1 = tp_candidates[0];
-        tp2 = tp_candidates[1];
-        tp3 = (sig.side == core::OrderSide::Buy)
-            ? (sig.trigger_price + stop_dist * 3.0)
-            : (sig.trigger_price - stop_dist * 3.0);
-    } else if (tp_candidates.size() == 1) {
-        tp1 = tp_candidates[0];
-        tp2 = (sig.side == core::OrderSide::Buy)
-            ? (sig.trigger_price + stop_dist * 2.0)
-            : (sig.trigger_price - stop_dist * 2.0);
-        tp3 = (sig.side == core::OrderSide::Buy)
-            ? (sig.trigger_price + stop_dist * 3.0)
-            : (sig.trigger_price - stop_dist * 3.0);
+    // 8.1. ТЗ ч.4: сначала пробуем TP от источника и ОРТ.
+    //      BUY:  source > entry, ort > source.
+    //      SELL: source < entry, ort < source.
+    //      Если did_create_new_source = true — TP1 смещается за источник (в ОРТ).
+    const bool src_ok =
+        (sig.side == core::OrderSide::Buy)
+            ? (ctx.has_source && ctx.source_level > sig.trigger_price)
+            : (ctx.has_source && ctx.source_level < sig.trigger_price);
+    const bool ort_ok =
+        (sig.side == core::OrderSide::Buy)
+            ? (ctx.has_ort && ctx.ort_level > ctx.source_level)
+            : (ctx.has_ort && ctx.ort_level < ctx.source_level);
+    if (src_ok) {
+        if (sig.did_create_new_source && ort_ok) {
+            // Добор ликвидности -> цель ЗА источником.
+            tp1 = ctx.ort_level;
+            tp2 = (sig.side == core::OrderSide::Buy)
+                ? (ctx.ort_level + stop_dist * 2.0)
+                : (ctx.ort_level - stop_dist * 2.0);
+            tp3 = (sig.side == core::OrderSide::Buy)
+                ? (ctx.ort_level + stop_dist * 4.0)
+                : (ctx.ort_level - stop_dist * 4.0);
+        } else {
+            // Классика: TP1 = источник, TP2 = ОРТ.
+            tp1 = ctx.source_level;
+            tp2 = ort_ok ? ctx.ort_level : ((sig.side == core::OrderSide::Buy)
+                ? (ctx.source_level + stop_dist * 2.0)
+                : (ctx.source_level - stop_dist * 2.0));
+            tp3 = (sig.side == core::OrderSide::Buy)
+                ? (tp2 + stop_dist * 2.0)
+                : (tp2 - stop_dist * 2.0);
+        }
     } else {
-        tp1 = (sig.side == core::OrderSide::Buy)
-            ? (sig.trigger_price + stop_dist * 1.0)
-            : (sig.trigger_price - stop_dist * 1.0);
-        tp2 = (sig.side == core::OrderSide::Buy)
-            ? (sig.trigger_price + stop_dist * 2.0)
-            : (sig.trigger_price - stop_dist * 2.0);
-        tp3 = (sig.side == core::OrderSide::Buy)
-            ? (sig.trigger_price + stop_dist * 3.0)
-            : (sig.trigger_price - stop_dist * 3.0);
+        // 8.2. Fallback: старые зоны + R:R множители.
+        std::vector<double> tp_candidates;
+        for (const auto& z : ctx.active_zones) {
+            if (!z.is_active) continue;
+            if (sig.side == core::OrderSide::Buy && z.price_level > sig.trigger_price)
+                tp_candidates.push_back(z.price_level);
+            if (sig.side == core::OrderSide::Sell && z.price_level < sig.trigger_price)
+                tp_candidates.push_back(z.price_level);
+        }
+        if (sig.side == core::OrderSide::Buy)
+            std::sort(tp_candidates.begin(), tp_candidates.end());
+        else
+            std::sort(tp_candidates.begin(), tp_candidates.end(), std::greater<double>());
+        if (tp_candidates.size() >= 3) {
+            tp1 = tp_candidates[0];
+            tp2 = tp_candidates[1];
+            tp3 = tp_candidates[2];
+        } else if (tp_candidates.size() == 2) {
+            tp1 = tp_candidates[0];
+            tp2 = tp_candidates[1];
+            tp3 = (sig.side == core::OrderSide::Buy)
+                ? (sig.trigger_price + stop_dist * 3.0)
+                : (sig.trigger_price - stop_dist * 3.0);
+        } else if (tp_candidates.size() == 1) {
+            tp1 = tp_candidates[0];
+            tp2 = (sig.side == core::OrderSide::Buy)
+                ? (sig.trigger_price + stop_dist * 2.0)
+                : (sig.trigger_price - stop_dist * 2.0);
+            tp3 = (sig.side == core::OrderSide::Buy)
+                ? (sig.trigger_price + stop_dist * 3.0)
+                : (sig.trigger_price - stop_dist * 3.0);
+        } else {
+            tp1 = (sig.side == core::OrderSide::Buy)
+                ? (sig.trigger_price + stop_dist * 1.0)
+                : (sig.trigger_price - stop_dist * 1.0);
+            tp2 = (sig.side == core::OrderSide::Buy)
+                ? (sig.trigger_price + stop_dist * 2.0)
+                : (sig.trigger_price - stop_dist * 2.0);
+            tp3 = (sig.side == core::OrderSide::Buy)
+                ? (sig.trigger_price + stop_dist * 3.0)
+                : (sig.trigger_price - stop_dist * 3.0);
+        }
     }
     // 9) Сборка финального запроса
     ValidationResult v;

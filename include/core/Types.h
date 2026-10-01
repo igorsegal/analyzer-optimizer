@@ -1,4 +1,4 @@
-﻿// =============================================================================
+// =============================================================================
 //  SPARTAK :: core/Types.h
 //  Базовые типы данных для всего конвейера стратегии «Зри в Корень» (ТАП).
 //
@@ -78,10 +78,19 @@ enum class PatternType {
     Consolidation,
     ImpulseBreakout
 };
+// Виды разворотных моментов (РМ) по курсу «Зри в Корень».
+enum class RMCategory {
+    None = 0,
+    RM_1_1,   // резкий импульс + откат + первое накопление
+    RM_1_2,   // двойная / тройная вершина с закреплением
+    RM_2_1,   // закрепление за уровнем (голова-плечи и др.)
+    RM_2_2    // заныривание в диапазон + выныривание
+};
 struct PatternSignal {
     bool        detected       = false;
     OrderSide   side           = OrderSide::Buy;
     PatternType type           = PatternType::None;
+    RMCategory  rm_category    = RMCategory::None;
     double      trigger_price  = 0.0;
     double      level          = 0.0;
     double      suggested_stop = 0.0;

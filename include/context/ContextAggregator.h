@@ -1,4 +1,4 @@
-﻿// =============================================================================
+// =============================================================================
 //  SPARTAK :: context/ContextAggregator.h
 //  Финальный оркестратор слоя context/.
 //
@@ -42,7 +42,7 @@ struct ContextAggregatorConfig {
     // Structure / trend
     std::size_t trend_lookback   = 3;
     // Level cleanup
-    int64_t max_level_age_ms     = 7LL * 86'400'000LL;
+    int64_t max_level_age_ms     = 3LL * 86'400'000LL;  // ТЗ: только зоны за последние 3 торговых дня
     int     level_break_buffer   = 30;
     // Верхний ТФ используется как «Daily» в тестах (в реальности — отдельный feed)
     bool    use_same_tf_for_both = true;

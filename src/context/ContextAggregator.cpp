@@ -1,4 +1,4 @@
-﻿#include "context/ContextAggregator.h"
+#include "context/ContextAggregator.h"
 #include "context/HighExtractor.h"
 #include "context/LowExtractor.h"
 #include "context/StructureValidatorHHHL.h"
@@ -27,7 +27,8 @@ ContextAggregator::ContextAggregator(ContextAggregatorConfig cfg)
           o.point               = cfg.point;
           return o;
       }()),
-      bias_(cfg.trend_lookback)
+      bias_(cfg.trend_lookback),
+      source_det_(cfg.source_zone)
 {
     if (cfg_.point <= 0.0)
         throw std::invalid_argument("ContextAggregatorConfig::point must be > 0");
@@ -95,6 +96,24 @@ ContextAggregator::analyze(const std::vector<core::Bar>& older_tf,
     const int64_t now_ms      = hourly_bars.back().timestamp;
     const double  last_close  = hourly_bars.back().close;
     cleaner_.cleanInPlace(ctx.active_zones, now_ms, last_close);
+    // ---------- 8. Источник тренда и ОРТ (ТЗ ч.4) ----------
+    {
+        const auto src = source_det_.find(hourly_bars);
+        if (src.found) {
+            const double offset =
+                static_cast<double>(cfg_.pu_offset_points) * cfg_.point;
+            ctx.source_level  = src.level;
+            ctx.source_top    = src.top;
+            ctx.source_bottom = src.bottom;
+            ctx.has_source    = true;
+            if (src.direction == core::TrendDirection::Bullish) {
+                ctx.ort_level = src.bottom - offset;
+            } else {
+                ctx.ort_level = src.top + offset;
+            }
+            ctx.has_ort = true;
+        }
+    }
     return ctx;
 }
 } // namespace spartak::context

@@ -17,6 +17,7 @@
 #pragma once
 #include "core/Types.h"
 #include "context/FractalPointDetector.h"
+#include "context/SourceZoneDetector.h"
 #include "context/ShadowNoiseFilter.h"
 #include "context/PUZoneCalculator.h"
 #include "context/LUZoneCalculator.h"
@@ -46,6 +47,8 @@ struct ContextAggregatorConfig {
     int     level_break_buffer   = 30;
     // Верхний ТФ используется как «Daily» в тестах (в реальности — отдельный feed)
     bool    use_same_tf_for_both = true;
+    // Source zone (TZ ch.4)
+    SourceZoneConfig source_zone;
 };
 // -----------------------------------------------------------------------------
 // ContextAggregator — stateful (держит подсобные объекты).
@@ -69,5 +72,6 @@ private:
     LUZoneCalculator        lu_calc_;
     OldLevelCleaner         cleaner_;
     TrendBiasEvaluator      bias_;
+    SourceZoneDetector      source_det_;
 };
 } // namespace spartak::context

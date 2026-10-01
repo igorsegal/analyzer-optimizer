@@ -29,7 +29,8 @@ ContextAggregator::ContextAggregator(ContextAggregatorConfig cfg)
           return o;
       }()),
       bias_(cfg.trend_lookback),
-      source_det_(cfg.source_zone)
+      source_det_(cfg.source_zone),
+      balance_det_(cfg.balance_shift)
 {
     if (cfg_.point <= 0.0)
         throw std::invalid_argument("ContextAggregatorConfig::point must be > 0");
@@ -113,6 +114,26 @@ ContextAggregator::analyze(const std::vector<core::Bar>& older_tf,
                 ctx.ort_level = src.top + offset;
             }
             ctx.has_ort = true;
+        }
+        // ---------- 9. Перевес / перелив (ТЗ ч.7) ----------
+        // Собираем последние две зоны-источника:
+        //   zone2 = самый свежий, zone1 = предыдущий (на срезе до начала zone2).
+        std::vector<SourceZone> zones;
+        if (src.found) {
+            if (src.start_index > cfg_.source_zone.min_bars_in_zone) {
+                std::vector<core::Bar> prefix(
+                    hourly_bars.begin(),
+                    hourly_bars.begin() + static_cast<long long>(src.start_index));
+                auto prev = source_det_.find(prefix);
+                if (prev.found) zones.push_back(prev);
+            }
+            zones.push_back(src);
+        }
+        const auto shift = balance_det_.detect(zones);
+        if (shift.found) {
+            ctx.has_balance      = true;
+            ctx.balance_side     = (shift.side == BalanceSide::Bullish) ? 1 : 2;
+            ctx.balance_strength = shift.strength;
         }
     }
     return ctx;

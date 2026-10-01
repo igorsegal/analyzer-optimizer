@@ -67,6 +67,10 @@ struct MarketContext {
     bool   has_source   = false;
     double ort_level    = 0.0;   // область разворота тенденции (за источником)
     bool   has_ort      = false;
+    // ТЗ ч.7: перевес / перелив баланса.
+    bool   has_balance     = false;
+    int    balance_side    = 0;   // 0=none, 1=bullish, 2=bearish
+    double balance_strength = 0.0;
 };
 // -----------------------------------------------------------------------------
 // 4. Направление торговой позиции

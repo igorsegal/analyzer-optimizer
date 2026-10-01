@@ -18,6 +18,7 @@
 #include "core/Types.h"
 #include "context/FractalPointDetector.h"
 #include "context/SourceZoneDetector.h"
+#include "context/BalanceShiftDetector.h"
 #include "context/ShadowNoiseFilter.h"
 #include "context/PUZoneCalculator.h"
 #include "context/LUZoneCalculator.h"
@@ -49,6 +50,7 @@ struct ContextAggregatorConfig {
     bool    use_same_tf_for_both = true;
     // Source zone (TZ ch.4)
     SourceZoneConfig source_zone;
+    BalanceShiftConfig balance_shift;
 };
 // -----------------------------------------------------------------------------
 // ContextAggregator — stateful (держит подсобные объекты).
@@ -73,5 +75,6 @@ private:
     OldLevelCleaner         cleaner_;
     TrendBiasEvaluator      bias_;
     SourceZoneDetector      source_det_;
+    BalanceShiftDetector    balance_det_;
 };
 } // namespace spartak::context
